@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "341967391187",
+    "project_id": "hello-f2bdb",
+    "storage_bucket": "hello-f2bdb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:341967391187:android:38beb8b396021b99efc726",
+        "android_client_info": {
+          "package_name": "com.example.hel_lo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "341967391187-k17un76mh13lnl3a9kdkpcajqqecj927.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD2IiT_gm9G-p9r4EiiQ8DFQNofNt7k1IU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "341967391187-k17un76mh13lnl3a9kdkpcajqqecj927.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

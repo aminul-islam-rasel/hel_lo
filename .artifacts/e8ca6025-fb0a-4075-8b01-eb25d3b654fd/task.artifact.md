@@ -1,0 +1,3 @@
+- [x] Add `flutter_contacts` dependency to `pubspec.yaml`
+- [x] Update `ContactsScreen` to load device contacts, request permission, normalize phone numbers, and filter registered users
+- [x] Verify the contact matching implementation

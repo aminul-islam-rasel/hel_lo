@@ -80,12 +80,33 @@ class ChatListScreen extends ConsumerWidget {
                   return data['status'] == 'pending' && data['requestedBy'] != currentUserId;
                 }).toList();
 
-                final inboxDocs = allDocs.where((doc) {
+                final Map<String, QueryDocumentSnapshot> uniqueInboxMap = {};
+                for (var doc in allDocs) {
                   final data = doc.data() as Map<String, dynamic>;
                   final status = data['status'];
                   final requestedBy = data['requestedBy'];
-                  return status != 'pending' || requestedBy == currentUserId;
-                }).toList();
+                  final isPending = status == 'pending' && requestedBy != currentUserId;
+
+                  if (!isPending) {
+                    final memberIds = List<String>.from(data['memberIds'] ?? []);
+                    final otherUserId = memberIds.firstWhere((id) => id != currentUserId, orElse: () => '');
+                    if (otherUserId.isNotEmpty) {
+                      if (!uniqueInboxMap.containsKey(otherUserId)) {
+                        uniqueInboxMap[otherUserId] = doc;
+                      } else {
+                        final existingDoc = uniqueInboxMap[otherUserId]!;
+                        final existingData = existingDoc.data() as Map<String, dynamic>;
+                        final existingTime = (existingData['lastMessageTime'] as Timestamp?) ?? (existingData['updatedAt'] as Timestamp?);
+                        final currentTime = (data['lastMessageTime'] as Timestamp?) ?? (data['updatedAt'] as Timestamp?);
+                        if (existingTime == null || (currentTime != null && currentTime.compareTo(existingTime) > 0)) {
+                          uniqueInboxMap[otherUserId] = doc;
+                        }
+                      }
+                    }
+                  }
+                }
+
+                final inboxDocs = uniqueInboxMap.values.toList();
 
                 inboxDocs.sort((a, b) {
                   final dataA = a.data() as Map<String, dynamic>;

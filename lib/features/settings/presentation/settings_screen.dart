@@ -111,7 +111,6 @@ class SettingsScreen extends ConsumerWidget {
               _buildSectionHeader(context, 'Preferences'),
               const SizedBox(height: AppSpacing.xs),
               _buildSettingsTile(context, Icons.notifications_outlined, 'Notifications', 'Message and call alert tones', () => context.push('/settings/notifications')),
-              _buildSettingsTile(context, Icons.data_usage_rounded, 'Storage & Network', 'Usage details and media download', () => context.push('/settings/storage')),
 
               const SizedBox(height: AppSpacing.xl),
               _buildSectionHeader(context, 'Support & App'),

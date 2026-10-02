@@ -14,7 +14,6 @@ import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/settings/presentation/profile_edit_screen.dart';
 import '../../features/settings/presentation/privacy_screen.dart';
 import '../../features/settings/presentation/notifications_settings_screen.dart';
-import '../../features/settings/presentation/storage_screen.dart';
 import '../../features/settings/presentation/blocked_users_screen.dart';
 import '../../features/settings/presentation/help_screen.dart';
 import '../../features/settings/presentation/about_screen.dart';
@@ -163,14 +162,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           context: context,
           state: state,
           child: const NotificationsSettingsScreen(),
-        ),
-      ),
-      GoRoute(
-        path: '/settings/storage',
-        pageBuilder: (context, state) => _fadeSlidePage(
-          context: context,
-          state: state,
-          child: const StorageScreen(),
         ),
       ),
       GoRoute(

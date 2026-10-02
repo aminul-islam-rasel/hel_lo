@@ -24,18 +24,14 @@ class ChatDetailScreen extends ConsumerStatefulWidget {
 class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool _isSending = false;
-  bool _hasText = false;
+  final ValueNotifier<bool> _hasTextNotifier = ValueNotifier(false);
 
   @override
   void initState() {
     super.initState();
     _markAsRead();
     _messageController.addListener(() {
-      final hasText = _messageController.text.trim().isNotEmpty;
-      if (hasText != _hasText) {
-        setState(() => _hasText = hasText);
-      }
+      _hasTextNotifier.value = _messageController.text.trim().isNotEmpty;
     });
   }
 
@@ -55,13 +51,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _hasTextNotifier.dispose();
     super.dispose();
   }
 
   Future<void> _sendCustomMessage(String text, {String type = 'text'}) async {
-    if (text.isEmpty || _isSending) return;
-
-    setState(() => _isSending = true);
+    if (text.isEmpty) return;
 
     try {
       final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
@@ -109,8 +104,6 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           SnackBar(content: Text('Failed to send message: $e'), backgroundColor: AppColors.error),
         );
       }
-    } finally {
-      if (mounted) setState(() => _isSending = false);
     }
   }
 
@@ -488,7 +481,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                           .orderBy('createdAt', descending: true)
                           .snapshots(),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                           return const Center(child: AppLoadingWidget(message: 'Loading messages...'));
                         }
                         if (snapshot.hasError) {
@@ -675,20 +668,25 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                               shape: BoxShape.circle,
                               boxShadow: AppShadows.floating,
                             ),
-                            child: IconButton(
-                              icon: Icon(
-                                _hasText ? Icons.send_rounded : Icons.mic_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              onPressed: () {
-                                if (_hasText) {
-                                  _sendMessage();
-                                } else {
-                                  _sendCustomMessage('🎤 Voice note', type: 'voice');
-                                }
+                            child: ValueListenableBuilder<bool>(
+                              valueListenable: _hasTextNotifier,
+                              builder: (context, hasText, child) {
+                                return IconButton(
+                                  icon: Icon(
+                                    hasText ? Icons.send_rounded : Icons.mic_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  onPressed: () {
+                                    if (hasText) {
+                                      _sendMessage();
+                                    } else {
+                                      _sendCustomMessage('🎤 Voice note', type: 'voice');
+                                    }
+                                  },
+                                  tooltip: hasText ? 'Send' : 'Voice Message',
+                                );
                               },
-                              tooltip: _hasText ? 'Send' : 'Voice Message',
                             ),
                           ),
                         ],

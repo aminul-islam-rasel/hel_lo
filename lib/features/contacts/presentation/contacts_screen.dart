@@ -89,7 +89,25 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
       final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
       if (currentUserId == null || targetUid.isEmpty) return;
 
-      final conversationId = ConversationUtils.generateConversationId(currentUserId, targetUid);
+      final existingQuery = await FirebaseFirestore.instance
+          .collection('conversations')
+          .where('memberIds', arrayContains: currentUserId)
+          .get();
+
+      String conversationId = '';
+      for (var doc in existingQuery.docs) {
+        final data = doc.data();
+        final members = List<String>.from(data['memberIds'] ?? []);
+        if (members.contains(targetUid)) {
+          conversationId = doc.id;
+          break;
+        }
+      }
+
+      if (conversationId.isEmpty) {
+        conversationId = ConversationUtils.generateConversationId(currentUserId, targetUid);
+      }
+
       final convRef = FirebaseFirestore.instance.collection('conversations').doc(conversationId);
       final convDoc = await convRef.get();
 
@@ -97,8 +115,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
         await convRef.set({
           'conversationId': conversationId,
           'memberIds': [currentUserId, targetUid],
-          'status': 'pending',
+          'status': 'accepted',
           'requestedBy': currentUserId,
+          'unreadBy': [],
           'updatedAt': FieldValue.serverTimestamp(),
           'lastMessageTime': FieldValue.serverTimestamp(),
         });
@@ -116,6 +135,83 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
     }
   }
 
+  void _showAddByPhoneDialog(BuildContext parentContext) {
+    final phoneController = TextEditingController();
+    final isDark = Theme.of(parentContext).brightness == Brightness.dark;
+
+    showDialog(
+      context: parentContext,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+        title: const Text('Add User by Phone Number'),
+        content: TextField(
+          controller: phoneController,
+          keyboardType: TextInputType.phone,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Phone Number',
+            hintText: 'Enter phone number',
+            prefixIcon: Icon(Icons.phone_iphone_rounded, color: AppColors.primary),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () async {
+              final rawPhone = phoneController.text.trim();
+              if (rawPhone.isEmpty) return;
+
+              try {
+                final targetDigits = rawPhone.replaceAll(RegExp(r'\D'), '');
+                final allUsers = await FirebaseFirestore.instance.collection('users').get();
+                String foundUid = '';
+
+                for (var doc in allUsers.docs) {
+                  final data = doc.data();
+                  final p = (data['phoneNumber'] ?? '').toString();
+                  final pDigits = p.replaceAll(RegExp(r'\D'), '');
+                  if (pDigits == targetDigits || pDigits.endsWith(targetDigits) || targetDigits.endsWith(pDigits)) {
+                    foundUid = data['uid'] ?? doc.id;
+                    break;
+                  }
+                }
+
+                if (!dialogContext.mounted) return;
+                Navigator.pop(dialogContext);
+
+                if (foundUid.isNotEmpty) {
+                  if (parentContext.mounted) {
+                    _openChat(parentContext, foundUid);
+                  }
+                } else {
+                  if (parentContext.mounted) {
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                      const SnackBar(content: Text('No registered user found with this phone number.'), backgroundColor: AppColors.error),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (!dialogContext.mounted) return;
+                Navigator.pop(dialogContext);
+                if (parentContext.mounted) {
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                    SnackBar(content: Text('Error finding user: $e'), backgroundColor: AppColors.error),
+                  );
+                }
+              }
+            },
+            child: const Text('Chat'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
@@ -131,6 +227,21 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
             Text('Contacts on Hel Lo', style: AppTextStyles.caption(context, color: theme.colorScheme.onSurfaceVariant)),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person_add_alt_1_rounded, size: 20, color: AppColors.primary),
+            ),
+            onPressed: () => _showAddByPhoneDialog(context),
+            tooltip: 'Add by phone number',
+          ),
+          const SizedBox(width: AppSpacing.md),
+        ],
       ),
       body: _isLoadingContacts
           ? const Center(child: AppLoadingWidget(message: 'Syncing device contacts...'))

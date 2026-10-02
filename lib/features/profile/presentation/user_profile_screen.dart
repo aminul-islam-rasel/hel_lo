@@ -37,23 +37,50 @@ class UserProfileScreen extends ConsumerWidget {
     final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
     if (currentUserId == null || userId.isEmpty) return;
 
-    final conversationId = ConversationUtils.generateConversationId(currentUserId, userId);
-    final convRef = FirebaseFirestore.instance.collection('conversations').doc(conversationId);
-    final convDoc = await convRef.get();
+    try {
+      final existingQuery = await FirebaseFirestore.instance
+          .collection('conversations')
+          .where('memberIds', arrayContains: currentUserId)
+          .get();
 
-    if (!convDoc.exists) {
-      await convRef.set({
-        'conversationId': conversationId,
-        'memberIds': [currentUserId, userId],
-        'status': 'pending',
-        'requestedBy': currentUserId,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'lastMessageTime': FieldValue.serverTimestamp(),
-      });
-    }
+      String conversationId = '';
+      for (var doc in existingQuery.docs) {
+        final data = doc.data();
+        final members = List<String>.from(data['memberIds'] ?? []);
+        if (members.contains(userId)) {
+          conversationId = doc.id;
+          break;
+        }
+      }
 
-    if (context.mounted) {
-      context.push('/chat/$conversationId');
+      if (conversationId.isEmpty) {
+        conversationId = ConversationUtils.generateConversationId(currentUserId, userId);
+      }
+
+      final convRef = FirebaseFirestore.instance.collection('conversations').doc(conversationId);
+      final convDoc = await convRef.get();
+
+      if (!convDoc.exists) {
+        await convRef.set({
+          'conversationId': conversationId,
+          'memberIds': [currentUserId, userId],
+          'status': 'accepted',
+          'requestedBy': currentUserId,
+          'unreadBy': [],
+          'updatedAt': FieldValue.serverTimestamp(),
+          'lastMessageTime': FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (context.mounted) {
+        context.push('/chat/$conversationId');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to open chat: $e'), backgroundColor: AppColors.error),
+        );
+      }
     }
   }
 

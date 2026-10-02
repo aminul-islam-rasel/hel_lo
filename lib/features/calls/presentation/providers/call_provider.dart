@@ -25,7 +25,13 @@ class CallState {
   final bool isSpeakerOn;
   final int callDuration;
   final RTCPeerConnectionState connectionState;
+  final RTCIceConnectionState? iceConnectionState;
   final String? errorMessage;
+  final bool hasRemoteStream;
+  final bool hasLocalAudio;
+  final bool hasLocalVideo;
+  final bool hasRemoteAudio;
+  final bool hasRemoteVideo;
 
   CallState({
     this.currentCall,
@@ -34,7 +40,13 @@ class CallState {
     this.isSpeakerOn = false,
     this.callDuration = 0,
     this.connectionState = RTCPeerConnectionState.RTCPeerConnectionStateNew,
+    this.iceConnectionState,
     this.errorMessage,
+    this.hasRemoteStream = false,
+    this.hasLocalAudio = false,
+    this.hasLocalVideo = false,
+    this.hasRemoteAudio = false,
+    this.hasRemoteVideo = false,
   });
 
   CallState copyWith({
@@ -44,7 +56,13 @@ class CallState {
     bool? isSpeakerOn,
     int? callDuration,
     RTCPeerConnectionState? connectionState,
+    RTCIceConnectionState? iceConnectionState,
     String? errorMessage,
+    bool? hasRemoteStream,
+    bool? hasLocalAudio,
+    bool? hasLocalVideo,
+    bool? hasRemoteAudio,
+    bool? hasRemoteVideo,
   }) {
     return CallState(
       currentCall: currentCall ?? this.currentCall,
@@ -53,7 +71,13 @@ class CallState {
       isSpeakerOn: isSpeakerOn ?? this.isSpeakerOn,
       callDuration: callDuration ?? this.callDuration,
       connectionState: connectionState ?? this.connectionState,
+      iceConnectionState: iceConnectionState ?? this.iceConnectionState,
       errorMessage: errorMessage,
+      hasRemoteStream: hasRemoteStream ?? this.hasRemoteStream,
+      hasLocalAudio: hasLocalAudio ?? this.hasLocalAudio,
+      hasLocalVideo: hasLocalVideo ?? this.hasLocalVideo,
+      hasRemoteAudio: hasRemoteAudio ?? this.hasRemoteAudio,
+      hasRemoteVideo: hasRemoteVideo ?? this.hasRemoteVideo,
     );
   }
 }
@@ -66,6 +90,7 @@ class CallNotifier extends StateNotifier<CallState> {
   Timer? _durationTimer;
   StreamSubscription? _callSubscription;
   StreamSubscription? _candidateSubscription;
+  bool _remoteDescriptionSet = false;
 
   CallNotifier(this._ref) : super(CallState()) {
     _callRepository = _ref.read(callRepositoryProvider);
@@ -89,10 +114,22 @@ class CallNotifier extends StateNotifier<CallState> {
       final user = fb.FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      // Request microphone and camera runtime permissions
-      await Permission.microphone.request();
-      if (type == CallType.video) {
-        await Permission.camera.request();
+      final isVideo = type == CallType.video;
+
+      final micPermission = await Permission.microphone.request();
+      debugPrint('Microphone permission: ${micPermission.isGranted ? "granted" : "denied"}');
+      if (!micPermission.isGranted) {
+        state = state.copyWith(errorMessage: 'Microphone permission denied');
+        return;
+      }
+
+      if (isVideo) {
+        final cameraPermission = await Permission.camera.request();
+        debugPrint('Camera permission: ${cameraPermission.isGranted ? "granted" : "denied"}');
+        if (!cameraPermission.isGranted) {
+          state = state.copyWith(errorMessage: 'Camera permission denied');
+          return;
+        }
       }
 
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
@@ -100,10 +137,11 @@ class CallNotifier extends StateNotifier<CallState> {
       final callerPhoto = userDoc.data()?['profilePhoto'];
 
       await initRenderers();
-      await _webRtcService.openUserMedia(isVideo: type == CallType.video);
-      await _webRtcService.setupPeerConnection(isVideo: type == CallType.video);
+      await _webRtcService.initAudioSession(isVideo: isVideo);
+      await _webRtcService.openUserMedia(isVideo: isVideo);
+      await _webRtcService.setupPeerConnection(isVideo: isVideo);
 
-      final offer = await _webRtcService.createOffer();
+      final offer = await _webRtcService.createOffer(isVideo: isVideo);
 
       final callId = await _callRepository.createCall(
         callerId: user.uid,
@@ -130,7 +168,13 @@ class CallNotifier extends StateNotifier<CallState> {
         createdAt: DateTime.now(),
       );
 
-      state = state.copyWith(currentCall: newCall);
+      state = state.copyWith(
+        currentCall: newCall,
+        isSpeakerOn: isVideo,
+        hasLocalAudio: _webRtcService.hasLocalAudio,
+        hasLocalVideo: _webRtcService.hasLocalVideo,
+      );
+
       _setupWebRtcCallbacks(callId: callId, isCaller: true);
       _listenToCall(callId, isCaller: true);
     } catch (e) {
@@ -144,15 +188,28 @@ class CallNotifier extends StateNotifier<CallState> {
       final user = fb.FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      // Request microphone and camera runtime permissions
-      await Permission.microphone.request();
-      if (call.type == CallType.video) {
-        await Permission.camera.request();
+      final isVideo = call.type == CallType.video;
+
+      final micPermission = await Permission.microphone.request();
+      debugPrint('Microphone permission: ${micPermission.isGranted ? "granted" : "denied"}');
+      if (!micPermission.isGranted) {
+        state = state.copyWith(errorMessage: 'Microphone permission denied');
+        return;
+      }
+
+      if (isVideo) {
+        final cameraPermission = await Permission.camera.request();
+        debugPrint('Camera permission: ${cameraPermission.isGranted ? "granted" : "denied"}');
+        if (!cameraPermission.isGranted) {
+          state = state.copyWith(errorMessage: 'Camera permission denied');
+          return;
+        }
       }
 
       await initRenderers();
-      await _webRtcService.openUserMedia(isVideo: call.type == CallType.video);
-      await _webRtcService.setupPeerConnection(isVideo: call.type == CallType.video);
+      await _webRtcService.initAudioSession(isVideo: isVideo);
+      await _webRtcService.openUserMedia(isVideo: isVideo);
+      await _webRtcService.setupPeerConnection(isVideo: isVideo);
 
       _setupWebRtcCallbacks(callId: call.callId, isCaller: false);
 
@@ -161,11 +218,14 @@ class CallNotifier extends StateNotifier<CallState> {
         await _webRtcService.setRemoteDescription(offer.type ?? 'offer', offer.sdp ?? '');
       }
 
-      final answer = await _webRtcService.createAnswer();
+      final answer = await _webRtcService.createAnswer(isVideo: isVideo);
       await _callRepository.answerCall(callId: call.callId, answer: answer);
 
       state = state.copyWith(
         currentCall: call.copyWith(status: CallStatus.accepted, answeredAt: DateTime.now()),
+        isSpeakerOn: isVideo,
+        hasLocalAudio: _webRtcService.hasLocalAudio,
+        hasLocalVideo: _webRtcService.hasLocalVideo,
       );
 
       _listenToCall(call.callId, isCaller: false);
@@ -224,11 +284,11 @@ class CallNotifier extends StateNotifier<CallState> {
     try {
       final conversationId = ConversationUtils.generateConversationId(call.callerId, call.receiverId);
       final convRef = FirebaseFirestore.instance.collection('conversations').doc(conversationId);
-      
+
       final mins = (state.callDuration ~/ 60).toString().padLeft(2, '0');
       final secs = (state.callDuration % 60).toString().padLeft(2, '0');
       final durationStr = state.callDuration > 0 ? ' • $mins:$secs' : '';
-      
+
       String text;
       if (status == CallStatus.missed) {
         text = call.type == CallType.video ? '📞 Missed video call' : '📞 Missed audio call';
@@ -290,33 +350,59 @@ class CallNotifier extends StateNotifier<CallState> {
 
   void _setupWebRtcCallbacks({required String callId, required bool isCaller}) {
     _webRtcService.onCandidate = (RTCIceCandidate candidate) {
-      if (state.currentCall != null) {
+      final targetCallId = callId.isNotEmpty ? callId : (state.currentCall?.callId ?? '');
+      if (targetCallId.isNotEmpty) {
+        debugPrint('Saving ICE candidate to Firestore for callId=$targetCallId, isCaller=$isCaller');
         _callRepository.addIceCandidate(
-          callId: state.currentCall!.callId,
+          callId: targetCallId,
           candidate: candidate,
           isCaller: isCaller,
         );
+      } else {
+        debugPrint('WARNING: Cannot save ICE candidate because callId is empty!');
       }
     };
 
+    _webRtcService.onAddRemoteStream = (MediaStream stream) {
+      debugPrint('Remote stream callback triggered in CallNotifier');
+      state = state.copyWith(
+        hasRemoteStream: true,
+        hasRemoteAudio: _webRtcService.hasRemoteAudio,
+        hasRemoteVideo: _webRtcService.hasRemoteVideo,
+      );
+    };
+
     _webRtcService.onConnectionStateChanged = (RTCPeerConnectionState connectionState) {
+      debugPrint('CallNotifier RTCPeerConnectionState: $connectionState');
       state = state.copyWith(connectionState: connectionState);
       if (connectionState == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
         _startDurationTimer();
-      } else if (connectionState == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
-          connectionState == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
-        // Handle disconnection
+      }
+    };
+
+    _webRtcService.onIceConnectionStateChanged = (RTCIceConnectionState iceState) {
+      debugPrint('CallNotifier RTCIceConnectionState: $iceState');
+      state = state.copyWith(iceConnectionState: iceState);
+      if (iceState == RTCIceConnectionState.RTCIceConnectionStateConnected ||
+          iceState == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
+        _startDurationTimer();
       }
     };
 
     final effectiveCallId = callId.isNotEmpty ? callId : (state.currentCall?.callId ?? '');
     if (effectiveCallId.isNotEmpty) {
+      final Set<String> processedCandidates = {};
       _candidateSubscription?.cancel();
       _candidateSubscription = _callRepository
           .getCandidatesStream(effectiveCallId, isCaller)
           .listen((candidates) {
         for (var candidate in candidates) {
-          _webRtcService.addCandidate(candidate);
+          final key = '${candidate.candidate}_${candidate.sdpMid}_${candidate.sdpMLineIndex}';
+          if (!processedCandidates.contains(key)) {
+            processedCandidates.add(key);
+            debugPrint('Applying candidate from Firestore: $key');
+            _webRtcService.addCandidate(candidate);
+          }
         }
       });
     }
@@ -328,12 +414,18 @@ class CallNotifier extends StateNotifier<CallState> {
 
       state = state.copyWith(currentCall: call);
 
-      if (isCaller && call.status == CallStatus.accepted) {
+      if (isCaller && call.status == CallStatus.accepted && !_remoteDescriptionSet) {
         final answer = await _callRepository.getAnswer(callId);
         if (answer != null) {
+          _remoteDescriptionSet = true;
           await _webRtcService.setRemoteDescription(answer.type ?? 'answer', answer.sdp ?? '');
           await _callRepository.updateCallStatus(callId: callId, status: CallStatus.connected);
+          _startDurationTimer();
         }
+      } else if (!isCaller && call.status == CallStatus.accepted) {
+        _startDurationTimer();
+      } else if (call.status == CallStatus.connected) {
+        _startDurationTimer();
       }
 
       if (call.status == CallStatus.ended ||
@@ -359,6 +451,7 @@ class CallNotifier extends StateNotifier<CallState> {
     _callSubscription = null;
     _candidateSubscription?.cancel();
     _candidateSubscription = null;
+    _remoteDescriptionSet = false;
 
     await _webRtcService.dispose();
     state = CallState();

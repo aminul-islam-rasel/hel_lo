@@ -20,70 +20,91 @@ class StatusScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Status updates', style: AppTextStyles.headlineLarge(context)),
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.transparent,
+        title: Text(
+          'Stories & Status',
+          style: AppTextStyles.headlineLarge(context).copyWith(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
         children: [
-          InkWell(
-            onTap: () => context.push('/status/create'),
-            child: Row(
-              children: [
-                Stack(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        gradient: AppGradients.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const CircleAvatar(
-                        radius: 28,
-                        backgroundColor: AppColors.primary,
-                        child: Icon(Icons.person_rounded, color: Colors.white, size: 32),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: theme.scaffoldBackgroundColor, width: 2),
-                        ),
-                        child: const Icon(Icons.add_rounded, size: 14, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          // My Status Card
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+            ),
+            child: InkWell(
+              onTap: () => context.push('/status/create'),
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              child: Row(
+                children: [
+                  Stack(
                     children: [
-                      Text('My Status', style: AppTextStyles.titleMedium(context).copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text('Tap to add a status update', style: AppTextStyles.bodySmall(context, color: theme.colorScheme.onSurfaceVariant)),
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          gradient: AppGradients.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const CircleAvatar(
+                          radius: 26,
+                          backgroundColor: AppColors.primary,
+                          child: Icon(Icons.person_rounded, color: Colors.white, size: 28),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: theme.scaffoldBackgroundColor, width: 2),
+                          ),
+                          child: const Icon(Icons.add_rounded, size: 14, color: Colors.white),
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('My Story', style: AppTextStyles.titleMedium(context).copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 2),
+                        Text('Tap to post a status story', style: AppTextStyles.bodySmall(context, color: theme.colorScheme.onSurfaceVariant)),
+                      ],
+                    ),
                   ),
-                  child: const Icon(Icons.camera_alt_rounded, color: AppColors.primary, size: 20),
-                ),
-              ],
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.camera_alt_rounded, color: AppColors.primary, size: 20),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
           Text(
-            'RECENT UPDATES',
-            style: AppTextStyles.caption(context, color: AppColors.primary).copyWith(fontWeight: FontWeight.bold, letterSpacing: 0.8),
+            'RECENT STORIES',
+            style: AppTextStyles.caption(context, color: AppColors.primary).copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           StreamBuilder<QuerySnapshot>(
@@ -93,7 +114,7 @@ class StatusScreen extends ConsumerWidget {
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: AppLoadingWidget(message: 'Loading statuses...'));
+                return const Center(child: AppLoadingWidget(message: 'Loading stories...'));
               }
 
               final docs = snapshot.data?.docs ?? [];
@@ -101,16 +122,15 @@ class StatusScreen extends ConsumerWidget {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
                   child: Center(
-                    child: Text('No recent status updates.', style: AppTextStyles.bodyMedium(context, color: theme.colorScheme.onSurfaceVariant)),
+                    child: Text('No recent stories from contacts.', style: AppTextStyles.bodyMedium(context, color: theme.colorScheme.onSurfaceVariant)),
                   ),
                 );
               }
 
-              return ListView.separated(
+              return ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: docs.length,
-                separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
                 itemBuilder: (context, index) {
                   final data = docs[index].data() as Map<String, dynamic>;
                   final statusId = docs[index].id;
@@ -120,38 +140,46 @@ class StatusScreen extends ConsumerWidget {
                       ? 'Today, ${createdAt.hour}:${createdAt.minute.toString().padLeft(2, '0')}'
                       : 'Just now';
 
-                  return InkWell(
-                    onTap: () => context.push('/status/viewer/$statusId'),
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: AppGradients.statusRing,
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkCard : AppColors.lightCard,
+                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                      ),
+                      child: InkWell(
+                        onTap: () => context.push('/status/viewer/$statusId'),
+                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: AppGradients.statusRing,
+                              ),
+                              child: const CircleAvatar(
+                                radius: 26,
+                                backgroundColor: AppColors.primary,
+                                child: Icon(Icons.person_rounded, color: Colors.white, size: 28),
+                              ),
                             ),
-                            child: const CircleAvatar(
-                              radius: 26,
-                              backgroundColor: AppColors.primary,
-                              child: Icon(Icons.person_rounded, color: Colors.white, size: 28),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(userName, style: AppTextStyles.titleMedium(context).copyWith(fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 2),
+                                  Text(timeStr, style: AppTextStyles.bodySmall(context, color: theme.colorScheme.onSurfaceVariant)),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(userName, style: AppTextStyles.titleMedium(context).copyWith(fontWeight: FontWeight.w600)),
-                                const SizedBox(height: AppSpacing.xxs),
-                                Text(timeStr, style: AppTextStyles.bodySmall(context, color: theme.colorScheme.onSurfaceVariant)),
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
-                        ],
+                            const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+                          ],
+                        ),
                       ),
                     ),
                   );

@@ -12,26 +12,25 @@ import '../../../core/theme/text_styles.dart';
 import '../../../core/utils/conversation_utils.dart';
 import '../../calls/presentation/providers/call_provider.dart';
 import '../../calls/domain/entities/call.dart';
+import '../../auth/presentation/auth_controller.dart';
 
 class UserProfileScreen extends ConsumerWidget {
   final String userId;
   const UserProfileScreen({super.key, required this.userId});
 
-  Future<void> _startCall(BuildContext context, WidgetRef ref, String name, String? photo, CallType type) async {
-    await ref.read(callProvider.notifier).startCall(
+  void _startCall(BuildContext context, WidgetRef ref, String name, String? photo, CallType type) {
+    context.push('/calls/outgoing', extra: {
+      'receiverId': userId,
+      'receiverName': name,
+      'receiverPhoto': photo,
+      'callType': type,
+    });
+    ref.read(callProvider.notifier).startCall(
       receiverId: userId,
       receiverName: name,
       receiverPhoto: photo,
       type: type,
     );
-    if (context.mounted) {
-      context.push('/calls/outgoing', extra: {
-        'receiverId': userId,
-        'receiverName': name,
-        'receiverPhoto': photo,
-        'callType': type,
-      });
-    }
   }
 
   Future<void> _openChat(BuildContext context) async {
@@ -60,6 +59,12 @@ class UserProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentUserAsync = ref.watch(currentUserStreamProvider);
+    final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
+    final blockedList = currentUserAsync.value?.blockedUserIds ?? [];
+    final isBlocked = blockedList.contains(userId);
+
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
       builder: (context, snapshot) {
@@ -72,8 +77,9 @@ class UserProfileScreen extends ConsumerWidget {
           body: CustomScrollView(
             slivers: [
               SliverAppBar(
-                expandedHeight: 300,
+                expandedHeight: 280,
                 pinned: true,
+                backgroundColor: isDark ? AppColors.darkSurface : AppColors.primary,
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
@@ -82,7 +88,7 @@ class UserProfileScreen extends ConsumerWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const SizedBox(height: 36),
+                        const SizedBox(height: 38),
                         Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
@@ -91,17 +97,20 @@ class UserProfileScreen extends ConsumerWidget {
                             boxShadow: AppShadows.floating,
                           ),
                           child: const CircleAvatar(
-                            radius: 54,
+                            radius: 50,
                             backgroundColor: AppColors.primary,
-                            child: Icon(Icons.person_rounded, size: 64, color: Colors.white),
+                            child: Icon(Icons.person_rounded, size: 58, color: Colors.white),
                           ),
                         ),
                         const SizedBox(height: AppSpacing.md),
                         Text(
                           name,
-                          style: AppTextStyles.headlineLarge(context, color: Colors.white).copyWith(fontSize: 26),
+                          style: AppTextStyles.headlineLarge(context, color: Colors.white).copyWith(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        const SizedBox(height: AppSpacing.xxs),
+                        const SizedBox(height: 2),
                         Text(
                           phone,
                           style: AppTextStyles.bodyMedium(context, color: Colors.white.withOpacity(0.85)),
@@ -116,20 +125,26 @@ class UserProfileScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.xl),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'ABOUT & STATUS',
-                              style: AppTextStyles.caption(context, color: AppColors.primary).copyWith(fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkCard : AppColors.lightCard,
+                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ABOUT & STATUS',
+                            style: AppTextStyles.caption(context, color: AppColors.primary).copyWith(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
                             ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(about, style: AppTextStyles.bodyLarge(context).copyWith(height: 1.4)),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(about, style: AppTextStyles.bodyLarge(context).copyWith(height: 1.4)),
+                        ],
                       ),
                     ),
                   ),
@@ -138,20 +153,23 @@ class UserProfileScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                     child: Column(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                ),
-                                onPressed: () => _openChat(context),
-                                icon: const Icon(Icons.chat_rounded),
-                                label: const Text('Message'),
-                              ),
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            gradient: AppGradients.primary,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            boxShadow: AppShadows.floating,
+                          ),
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
-                          ],
+                            onPressed: () => _openChat(context),
+                            icon: const Icon(Icons.forum_rounded),
+                            label: const Text('Start Chat'),
+                          ),
                         ),
                         const SizedBox(height: AppSpacing.md),
                         Row(
@@ -165,7 +183,7 @@ class UserProfileScreen extends ConsumerWidget {
                                 ),
                                 onPressed: () => _startCall(context, ref, name, userData?['profilePhoto'], CallType.audio),
                                 icon: const Icon(Icons.call_rounded, color: AppColors.primary),
-                                label: const Text('Audio Call'),
+                                label: const Text('Voice Call'),
                               ),
                             ),
                             const SizedBox(width: AppSpacing.md),
@@ -183,6 +201,39 @@ class UserProfileScreen extends ConsumerWidget {
                             ),
                           ],
                         ),
+                        const SizedBox(height: AppSpacing.md),
+                        if (currentUserId != null && currentUserId != userId)
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: isBlocked ? AppColors.primary : AppColors.error,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
+                                side: BorderSide(color: isBlocked ? AppColors.primary : AppColors.error, width: 1.5),
+                              ),
+                              onPressed: () async {
+                                final authNotifier = ref.read(authControllerProvider.notifier);
+                                if (isBlocked) {
+                                  await authNotifier.unblockUser(userId);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('User unblocked successfully')),
+                                    );
+                                  }
+                                } else {
+                                  await authNotifier.blockUser(userId);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('User blocked successfully')),
+                                    );
+                                  }
+                                }
+                              },
+                              icon: Icon(isBlocked ? Icons.check_circle_outline_rounded : Icons.block_rounded),
+                              label: Text(isBlocked ? 'Unblock User' : 'Block User'),
+                            ),
+                          ),
                       ],
                     ),
                   ),

@@ -21,21 +21,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   final List<OnboardingItem> _items = [
     OnboardingItem(
-      icon: Icons.chat_bubble_rounded,
+      icon: Icons.forum_rounded,
       title: 'Lightning Fast Conversations',
-      description: 'Connect instantly with friends, family, and colleagues in real-time with zero lag.',
+      description: 'Connect instantly with friends and communities in real-time with zero lag.',
       badge: 'Real-Time Sync',
     ),
     OnboardingItem(
-      icon: Icons.shield_rounded,
-      title: 'Bank-Grade Security',
-      description: 'Your messages and media are protected with modern encryption standards and robust privacy rules.',
+      icon: Icons.security_rounded,
+      title: 'Bank-Grade Privacy',
+      description: 'Your messages and media are protected with modern encryption and granular controls.',
       badge: 'End-to-End Secure',
     ),
     OnboardingItem(
-      icon: Icons.auto_awesome_rounded,
-      title: 'Immersive Multimedia',
-      description: 'Share voice notes, stories, status updates, crystal-clear calls, and rich attachments effortlessly.',
+      icon: Icons.video_call_rounded,
+      title: 'HD Calling & Stories',
+      description: 'Experience crystal-clear WebRTC video calls, voice messages, and status stories.',
       badge: 'Rich Experience',
     ),
   ];
@@ -49,7 +49,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       body: SafeArea(
@@ -63,17 +62,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          gradient: AppGradients.primary,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
-                        child: const Icon(Icons.chat_bubble_rounded, color: AppColors.primary, size: 20),
+                        child: const Icon(Icons.forum_rounded, color: Colors.white, size: 20),
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Text(
                         'Hel Lo',
-                        style: AppTextStyles.titleLarge(context).copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                        style: AppTextStyles.titleLarge(context).copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
+                        ),
                       ),
                     ],
                   ),
@@ -97,24 +100,26 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(36),
+                          padding: const EdgeInsets.all(38),
                           decoration: BoxDecoration(
                             gradient: AppGradients.primary,
                             shape: BoxShape.circle,
                             boxShadow: AppShadows.floating,
                           ),
-                          child: Icon(item.icon, size: 84, color: Colors.white),
+                          child: Icon(item.icon, size: 80, color: Colors.white),
                         ),
                         const SizedBox(height: AppSpacing.xxxl),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: AppColors.primary.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(AppRadius.pill),
                           ),
                           child: Text(
                             item.badge,
-                            style: AppTextStyles.caption(context, color: AppColors.primary).copyWith(fontWeight: FontWeight.bold),
+                            style: AppTextStyles.caption(context, color: AppColors.primary).copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         const SizedBox(height: AppSpacing.md),
@@ -156,18 +161,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               const SizedBox(height: AppSpacing.xxl),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (_currentPage < _items.length - 1) {
-                      _pageController.nextPage(
-                        duration: const Duration(milliseconds: 400),
-                        curve: Curves.easeInOutCubic,
-                      );
-                    } else {
-                      context.go('/login');
-                    }
-                  },
-                  child: Text(_currentPage == _items.length - 1 ? 'Get Started Now' : 'Continue'),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.primary,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    boxShadow: AppShadows.floating,
+                  ),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                    ),
+                    onPressed: () {
+                      if (_currentPage < _items.length - 1) {
+                        _pageController.nextPage(
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeInOutCubic,
+                        );
+                      } else {
+                        context.go('/login');
+                      }
+                    },
+                    child: Text(_currentPage == _items.length - 1 ? 'Get Started Now' : 'Continue'),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),

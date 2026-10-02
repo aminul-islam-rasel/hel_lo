@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../core/widgets/app_loading_widget.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -13,14 +14,15 @@ class NotificationsSettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserStreamProvider);
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Notifications', style: AppTextStyles.headlineLarge(context)),
+        title: Text('Notifications', style: AppTextStyles.headlineLarge(context).copyWith(fontSize: 22, fontWeight: FontWeight.bold)),
       ),
       body: userAsync.when(
         loading: () => const Center(child: AppLoadingWidget(message: 'Loading notification settings...')),
-        error: (err, _) => Center(child: Text('Error loading notification settings: $err')),
+        error: (err, _) => Center(child: Text('Error loading settings: $err')),
         data: (user) {
           final settings = user?.notificationSettings ?? {};
           final sound = settings['sound'] as bool? ?? true;
@@ -34,31 +36,34 @@ class NotificationsSettingsScreen extends ConsumerWidget {
           }
 
           return ListView(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             children: [
-              SwitchListTile(
-                title: Text('Conversation Tones', style: AppTextStyles.titleMedium(context)),
-                subtitle: Text('Play sounds for incoming and outgoing messages.', style: AppTextStyles.bodySmall(context, color: theme.colorScheme.onSurfaceVariant)),
-                value: sound,
-                onChanged: (val) => updateSetting('sound', val),
-                activeTrackColor: AppColors.primary,
-              ),
-              SwitchListTile(
-                title: Text('Vibrate', style: AppTextStyles.titleMedium(context)),
-                value: vibrate,
-                onChanged: (val) => updateSetting('vibrate', val),
-                activeTrackColor: AppColors.primary,
-              ),
-              SwitchListTile(
-                title: Text('Message Preview', style: AppTextStyles.titleMedium(context)),
-                subtitle: Text('Show message preview inside notifications.', style: AppTextStyles.bodySmall(context, color: theme.colorScheme.onSurfaceVariant)),
-                value: preview,
-                onChanged: (val) => updateSetting('preview', val),
-                activeTrackColor: AppColors.primary,
-              ),
+              _buildSwitchCard(context, isDark, 'Conversation Tones', 'Play sounds for incoming & outgoing messages', sound, (val) => updateSetting('sound', val)),
+              const SizedBox(height: AppSpacing.sm),
+              _buildSwitchCard(context, isDark, 'Vibrate', 'Vibrate phone on alerts', vibrate, (val) => updateSetting('vibrate', val)),
+              const SizedBox(height: AppSpacing.sm),
+              _buildSwitchCard(context, isDark, 'Message Preview', 'Show message text in notification banners', preview, (val) => updateSetting('preview', val)),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildSwitchCard(BuildContext context, bool isDark, String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+      ),
+      child: SwitchListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+        title: Text(title, style: AppTextStyles.titleMedium(context).copyWith(fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle, style: AppTextStyles.bodySmall(context)),
+        value: value,
+        onChanged: onChanged,
+        activeColor: AppColors.primary,
       ),
     );
   }

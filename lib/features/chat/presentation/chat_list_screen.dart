@@ -22,6 +22,8 @@ class ChatListScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.transparent,
         title: Row(
           children: [
             Container(
@@ -31,47 +33,31 @@ class ChatListScreen extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(AppRadius.md),
                 boxShadow: AppShadows.lightSubtle,
               ),
-              child: const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 20),
+              child: const Icon(Icons.forum_rounded, color: Colors.white, size: 22),
             ),
             const SizedBox(width: AppSpacing.md),
-            Text(
-              'Hel Lo',
-              style: AppTextStyles.headlineLarge(context).copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hel Lo',
+                  style: AppTextStyles.titleLarge(context).copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                Text(
+                  'Stay connected',
+                  style: AppTextStyles.caption(
+                    context,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.search_rounded, size: 20, color: AppColors.primary),
-            ),
-            onPressed: () => context.push('/search'),
-            tooltip: 'Search',
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.primary),
-            ),
-            onPressed: () => context.push('/settings'),
-            tooltip: 'Settings',
-          ),
-          const SizedBox(width: AppSpacing.sm),
-        ],
       ),
       body: currentUserId == null
           ? Center(
@@ -89,7 +75,6 @@ class ChatListScreen extends ConsumerWidget {
 
                 final allDocs = snapshot.data?.docs ?? [];
 
-                // Separate incoming pending requests vs active inbox chats
                 final pendingRequests = allDocs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
                   return data['status'] == 'pending' && data['requestedBy'] != currentUserId;
@@ -99,7 +84,6 @@ class ChatListScreen extends ConsumerWidget {
                   final data = doc.data() as Map<String, dynamic>;
                   final status = data['status'];
                   final requestedBy = data['requestedBy'];
-                  // Show in inbox if accepted, or if no status set yet (legacy), or if current user requested it
                   return status != 'pending' || requestedBy == currentUserId;
                 }).toList();
 
@@ -119,12 +103,44 @@ class ChatListScreen extends ConsumerWidget {
 
                 return Column(
                   children: [
-                    // Message Requests Banner if there are pending incoming requests
+                    // Quick Search Bar Header Card
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                      child: InkWell(
+                        onTap: () => context.push('/search'),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            border: Border.all(
+                              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.search_rounded, size: 20, color: AppColors.primary),
+                              const SizedBox(width: AppSpacing.md),
+                              Text(
+                                'Search conversations & people...',
+                                style: AppTextStyles.bodyMedium(
+                                  context,
+                                  color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Pending Requests Banner
                     if (pendingRequests.isNotEmpty)
                       InkWell(
                         onTap: () => context.push('/chat/requests'),
                         child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
                           padding: const EdgeInsets.all(AppSpacing.md),
                           decoration: BoxDecoration(
                             gradient: AppGradients.primary,
@@ -163,6 +179,7 @@ class ChatListScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
+
                     Expanded(
                       child: inboxDocs.isEmpty
                           ? Center(
@@ -178,34 +195,44 @@ class ChatListScreen extends ConsumerWidget {
                                         shape: BoxShape.circle,
                                         boxShadow: AppShadows.floating,
                                       ),
-                                      child: const Icon(Icons.chat_bubble_outline_rounded, size: 64, color: Colors.white),
+                                      child: const Icon(Icons.forum_outlined, size: 60, color: Colors.white),
                                     ),
                                     const SizedBox(height: AppSpacing.xl),
                                     Text(
-                                      'No Conversations Yet',
+                                      'Start a Conversation',
                                       style: AppTextStyles.headlineMedium(context).copyWith(fontWeight: FontWeight.bold),
                                       textAlign: TextAlign.center,
                                     ),
                                     const SizedBox(height: AppSpacing.sm),
                                     Text(
-                                      'Start connecting with friends and family by tapping the button below.',
+                                      'Connect with someone and begin chatting instantly.',
                                       style: AppTextStyles.bodyMedium(context, color: theme.colorScheme.onSurfaceVariant),
                                       textAlign: TextAlign.center,
                                     ),
                                     const SizedBox(height: AppSpacing.xxl),
-                                    ElevatedButton.icon(
-                                      onPressed: () => context.push('/contacts'),
-                                      icon: const Icon(Icons.person_add_rounded),
-                                      label: const Text('Start New Chat'),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        gradient: AppGradients.primary,
+                                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                                        boxShadow: AppShadows.floating,
+                                      ),
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.transparent,
+                                          shadowColor: Colors.transparent,
+                                        ),
+                                        onPressed: () => context.push('/contacts'),
+                                        icon: const Icon(Icons.person_add_rounded),
+                                        label: const Text('Find People'),
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
                             )
-                          : ListView.separated(
+                          : ListView.builder(
                               itemCount: inboxDocs.length,
-                              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                              separatorBuilder: (context, index) => const Divider(indent: 84, height: 1),
+                              padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: 80),
                               itemBuilder: (context, index) {
                                 final data = inboxDocs[index].data() as Map<String, dynamic>;
                                 final conversationId = inboxDocs[index].id;
@@ -213,8 +240,8 @@ class ChatListScreen extends ConsumerWidget {
                                 final lastTime = (data['lastMessageTime'] as Timestamp?) ?? (data['updatedAt'] as Timestamp?);
                                 final memberIds = List<String>.from(data['memberIds'] ?? []);
                                 final otherUserId = memberIds.firstWhere((id) => id != currentUserId, orElse: () => '');
-                                final lastSenderId = data['lastMessageSenderId'];
-                                final isUnread = lastSenderId != null && lastSenderId != currentUserId;
+                                final unreadBy = List<String>.from(data['unreadBy'] ?? []);
+                                final isUnread = currentUserId != null && unreadBy.contains(currentUserId);
 
                                 return StreamBuilder<DocumentSnapshot>(
                                   stream: otherUserId.isNotEmpty
@@ -225,113 +252,139 @@ class ChatListScreen extends ConsumerWidget {
                                     final otherName = userData?['displayName'] ?? 'User';
                                     final isOnline = userData?['isOnline'] ?? false;
 
-                                    return InkWell(
-                                      onTap: () => context.push('/chat/$conversationId'),
-                                      child: Container(
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.lg,
+                                        vertical: AppSpacing.xs,
+                                      ),
+                                      child: Material(
                                         color: isUnread
-                                            ? (isDark ? AppColors.darkSurfaceVariant.withOpacity(0.4) : AppColors.primary.withOpacity(0.04))
-                                            : Colors.transparent,
-                                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm + 2),
-                                        child: Row(
-                                          children: [
-                                            Stack(
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.all(2),
-                                                  decoration: BoxDecoration(
-                                                    gradient: isOnline ? AppGradients.statusRing : null,
-                                                    color: isOnline ? null : AppColors.primary.withOpacity(0.2),
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                  child: const CircleAvatar(
-                                                    radius: 28,
-                                                    backgroundColor: AppColors.primary,
-                                                    child: Icon(Icons.person_rounded, color: Colors.white, size: 30),
-                                                  ),
-                                                ),
-                                                if (isOnline)
-                                                  Positioned(
-                                                    bottom: 2,
-                                                    right: 2,
-                                                    child: Container(
-                                                      width: 14,
-                                                      height: 14,
-                                                      decoration: BoxDecoration(
-                                                        color: AppColors.online,
-                                                        shape: BoxShape.circle,
-                                                        border: Border.all(color: theme.scaffoldBackgroundColor, width: 2.5),
-                                                      ),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                            const SizedBox(width: AppSpacing.md),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      Expanded(
-                                                        child: Text(
-                                                          otherName,
-                                                          style: AppTextStyles.titleMedium(context).copyWith(
-                                                            fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                        ),
-                                                      ),
-                                                      if (lastTime != null)
-                                                        Text(
-                                                          _formatTime(lastTime.toDate()),
-                                                          style: AppTextStyles.caption(
-                                                            context,
-                                                            color: isUnread ? AppColors.primary : null,
-                                                          ).copyWith(fontWeight: isUnread ? FontWeight.bold : FontWeight.w500),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: AppSpacing.xxs + 2),
-                                                  Row(
-                                                    children: [
-                                                      if (!isUnread) ...[
-                                                        const Icon(Icons.done_all_rounded, size: 16, color: AppColors.readReceiptBlue),
-                                                        const SizedBox(width: AppSpacing.xxs),
-                                                      ],
-                                                      Expanded(
-                                                        child: Text(
-                                                          lastMessage,
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                          style: AppTextStyles.bodySmall(
-                                                            context,
-                                                            color: isUnread ? (isDark ? Colors.white : AppColors.lightTextPrimary) : theme.colorScheme.onSurfaceVariant,
-                                                          ).copyWith(
-                                                            fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      if (isUnread)
-                                                        Container(
-                                                          margin: const EdgeInsets.only(left: AppSpacing.sm),
-                                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                          decoration: BoxDecoration(
-                                                            color: AppColors.primary,
-                                                            borderRadius: BorderRadius.circular(AppRadius.pill),
-                                                          ),
-                                                          child: Text(
-                                                            'NEW',
-                                                            style: AppTextStyles.caption(context, color: Colors.white).copyWith(fontSize: 10, fontWeight: FontWeight.bold),
-                                                          ),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                ],
+                                            ? (isDark ? AppColors.primary.withOpacity(0.15) : AppColors.primary.withOpacity(0.06))
+                                            : (isDark ? AppColors.darkCard : AppColors.lightCard),
+                                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(AppRadius.xl),
+                                          onTap: () => context.push('/chat/$conversationId'),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(AppSpacing.md),
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(AppRadius.xl),
+                                              border: Border.all(
+                                                color: isUnread
+                                                    ? AppColors.primary.withOpacity(0.3)
+                                                    : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
                                               ),
                                             ),
-                                          ],
+                                            child: Row(
+                                              children: [
+                                                Stack(
+                                                  children: [
+                                                    Container(
+                                                      padding: const EdgeInsets.all(2),
+                                                      decoration: BoxDecoration(
+                                                        gradient: isOnline ? AppGradients.statusRing : null,
+                                                        color: isOnline ? null : AppColors.primary.withOpacity(0.15),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: const CircleAvatar(
+                                                        radius: 26,
+                                                        backgroundColor: AppColors.primary,
+                                                        child: Icon(Icons.person_rounded, color: Colors.white, size: 28),
+                                                      ),
+                                                    ),
+                                                    if (isOnline)
+                                                      Positioned(
+                                                        bottom: 2,
+                                                        right: 2,
+                                                        child: Container(
+                                                          width: 14,
+                                                          height: 14,
+                                                          decoration: BoxDecoration(
+                                                            color: AppColors.online,
+                                                            shape: BoxShape.circle,
+                                                            border: Border.all(
+                                                              color: theme.scaffoldBackgroundColor,
+                                                              width: 2.5,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                                const SizedBox(width: AppSpacing.md),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Row(
+                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                        children: [
+                                                          Expanded(
+                                                            child: Text(
+                                                              otherName,
+                                                              style: AppTextStyles.titleMedium(context).copyWith(
+                                                                fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
+                                                              ),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                          ),
+                                                          if (lastTime != null)
+                                                            Text(
+                                                              _formatTime(lastTime.toDate()),
+                                                              style: AppTextStyles.caption(
+                                                                context,
+                                                                color: isUnread ? AppColors.primary : null,
+                                                              ).copyWith(fontWeight: isUnread ? FontWeight.bold : FontWeight.w500),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Row(
+                                                        children: [
+                                                          if (!isUnread) ...[
+                                                            const Icon(Icons.done_all_rounded, size: 16, color: AppColors.readReceiptBlue),
+                                                            const SizedBox(width: 4),
+                                                          ],
+                                                          Expanded(
+                                                            child: Text(
+                                                              lastMessage,
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                              style: AppTextStyles.bodySmall(
+                                                                context,
+                                                                color: isUnread
+                                                                    ? (isDark ? Colors.white : AppColors.lightTextPrimary)
+                                                                    : theme.colorScheme.onSurfaceVariant,
+                                                              ).copyWith(
+                                                                fontWeight: isUnread ? FontWeight.w600 : FontWeight.normal,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          if (isUnread)
+                                                            Container(
+                                                              margin: const EdgeInsets.only(left: AppSpacing.sm),
+                                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                              decoration: BoxDecoration(
+                                                                gradient: AppGradients.primary,
+                                                                borderRadius: BorderRadius.circular(AppRadius.pill),
+                                                              ),
+                                                              child: Text(
+                                                                'NEW',
+                                                                style: AppTextStyles.caption(context, color: Colors.white).copyWith(
+                                                                  fontSize: 10,
+                                                                  fontWeight: FontWeight.bold,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     );

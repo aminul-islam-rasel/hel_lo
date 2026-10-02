@@ -25,6 +25,31 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSending = false;
+  bool _hasText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _markAsRead();
+    _messageController.addListener(() {
+      final hasText = _messageController.text.trim().isNotEmpty;
+      if (hasText != _hasText) {
+        setState(() => _hasText = hasText);
+      }
+    });
+  }
+
+  Future<void> _markAsRead() async {
+    final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('conversations').doc(widget.conversationId).update({
+        'unreadBy': FieldValue.arrayRemove([currentUserId]),
+      });
+    } catch (e) {
+      debugPrint('Error marking as read: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -62,6 +87,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
       await messageRef.set(messageData);
 
+      final convDoc = await FirebaseFirestore.instance.collection('conversations').doc(widget.conversationId).get();
+      final convData = convDoc.data() as Map<String, dynamic>?;
+      final memberIds = List<String>.from(convData?['memberIds'] ?? []);
+      final recipients = memberIds.where((id) => id != currentUserId).toList();
+
       await FirebaseFirestore.instance
           .collection('conversations')
           .doc(widget.conversationId)
@@ -69,10 +99,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         'lastMessage': type == 'text' ? text : '[$type shared]',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'lastMessageSenderId': currentUserId,
+        'unreadBy': recipients,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // Message sent successfully
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -91,9 +121,16 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     await _sendCustomMessage(text, type: 'text');
   }
 
-  void _showAttachmentBottomSheet() {
+  void _showOptions(BuildContext context, DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final isDeleted = data['isDeleted'] ?? false;
+    if (isDeleted) return;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showModalBottomSheet(
       context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
@@ -103,10 +140,147 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
+              width: 42,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.4),
+                color: Colors.grey.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text('Message Options', style: AppTextStyles.headlineMedium(context).copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: AppSpacing.lg),
+            ListTile(
+              leading: const Icon(Icons.edit_rounded, color: AppColors.primary),
+              title: const Text('Edit Message'),
+              onTap: () {
+                Navigator.pop(context);
+                _editMessage(context, doc);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_rounded, color: AppColors.error),
+              title: const Text('Delete Message', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(context);
+                _deleteMessage(context, doc);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _editMessage(BuildContext context, DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final currentText = data['text'] ?? '';
+    final editController = TextEditingController(text: currentText);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Message'),
+        content: TextField(
+          controller: editController,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Edit message...'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newText = editController.text.trim();
+              Navigator.pop(context);
+              if (newText.isEmpty || newText == currentText) return;
+
+              try {
+                await FirebaseFirestore.instance
+                    .collection('conversations')
+                    .doc(widget.conversationId)
+                    .collection('messages')
+                    .doc(doc.id)
+                    .update({
+                  'text': newText,
+                  'isEdited': true,
+                });
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to edit message: $e'), backgroundColor: AppColors.error),
+                  );
+                }
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteMessage(BuildContext context, DocumentSnapshot doc) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Message'),
+        content: const Text('Are you sure you want to delete this message for everyone?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await FirebaseFirestore.instance
+                    .collection('conversations')
+                    .doc(widget.conversationId)
+                    .collection('messages')
+                    .doc(doc.id)
+                    .update({
+                  'isDeleted': true,
+                  'text': '🚫 This message was deleted',
+                });
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete message: $e'), backgroundColor: AppColors.error),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAttachmentBottomSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
             ),
@@ -116,19 +290,19 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildAttachmentOption(Icons.image_rounded, 'Gallery', Colors.purple, () {
+                _buildAttachmentOption(Icons.image_rounded, 'Gallery', const Color(0xFF8B5CF6), () {
                   Navigator.pop(context);
-                  _sendCustomMessage('📷 Image shared', type: 'image');
+                  _sendCustomMessage('📷 Photo shared', type: 'image');
                 }),
-                _buildAttachmentOption(Icons.camera_alt_rounded, 'Camera', Colors.pink, () {
+                _buildAttachmentOption(Icons.camera_alt_rounded, 'Camera', const Color(0xFFEC4899), () {
                   Navigator.pop(context);
-                  _sendCustomMessage('📸 Photo taken', type: 'image');
+                  _sendCustomMessage('📸 Photo captured', type: 'image');
                 }),
-                _buildAttachmentOption(Icons.insert_drive_file_rounded, 'Document', Colors.indigo, () {
+                _buildAttachmentOption(Icons.insert_drive_file_rounded, 'Document', const Color(0xFF6366F1), () {
                   Navigator.pop(context);
                   _sendCustomMessage('📄 Document.pdf', type: 'document');
                 }),
-                _buildAttachmentOption(Icons.location_on_rounded, 'Location', Colors.green, () {
+                _buildAttachmentOption(Icons.location_on_rounded, 'Location', const Color(0xFF10B981), () {
                   Navigator.pop(context);
                   _sendCustomMessage('📍 Current Location', type: 'location');
                 }),
@@ -150,8 +324,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withOpacity(0.12),
               shape: BoxShape.circle,
+              border: Border.all(color: color.withOpacity(0.3), width: 1.5),
             ),
             child: Icon(icon, color: color, size: 28),
           ),
@@ -180,30 +355,39 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               : null,
           builder: (context, userSnapshot) {
             final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
-            final otherName = userData?['displayName'] ?? 'Hel Lo User';
+            final otherName = userData?['displayName'] ?? 'User';
             final isOnline = userData?['isOnline'] ?? false;
 
             return Scaffold(
               appBar: AppBar(
+                scrolledUnderElevation: 1,
                 titleSpacing: 0,
                 title: InkWell(
                   onTap: () => context.push('/profile/$otherUserId'),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   child: Row(
                     children: [
                       Stack(
                         children: [
-                          const CircleAvatar(
-                            radius: 20,
-                            backgroundColor: AppColors.primary,
-                            child: Icon(Icons.person_rounded, color: Colors.white, size: 22),
+                          Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              gradient: isOnline ? AppGradients.statusRing : null,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const CircleAvatar(
+                              radius: 20,
+                              backgroundColor: AppColors.primary,
+                              child: Icon(Icons.person_rounded, color: Colors.white, size: 22),
+                            ),
                           ),
                           if (isOnline)
                             Positioned(
                               bottom: 0,
                               right: 0,
                               child: Container(
-                                width: 10,
-                                height: 10,
+                                width: 11,
+                                height: 11,
                                 decoration: BoxDecoration(
                                   color: AppColors.online,
                                   shape: BoxShape.circle,
@@ -213,14 +397,23 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                             ),
                         ],
                       ),
-                      const SizedBox(width: AppSpacing.md),
+                      const SizedBox(width: AppSpacing.sm + 2),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(otherName, style: AppTextStyles.titleMedium(context).copyWith(fontWeight: FontWeight.w600)),
                           Text(
-                            isOnline ? 'Online' : 'Offline',
-                            style: AppTextStyles.caption(context, color: isOnline ? AppColors.online : AppColors.offline),
+                            otherName,
+                            style: AppTextStyles.titleMedium(context).copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            isOnline ? 'Online now' : 'Offline',
+                            style: AppTextStyles.caption(
+                              context,
+                              color: isOnline ? AppColors.online : AppColors.offline,
+                            ).copyWith(fontWeight: isOnline ? FontWeight.bold : FontWeight.normal),
                           ),
                         ],
                       ),
@@ -229,40 +422,50 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 ),
                 actions: [
                   IconButton(
-                    icon: const Icon(Icons.videocam_rounded, color: AppColors.primary),
-                    onPressed: () async {
+                    icon: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.videocam_rounded, color: AppColors.primary, size: 18),
+                    ),
+                    onPressed: () {
                       if (otherUserId.isEmpty) return;
-                      await ref.read(callProvider.notifier).startCall(
+                      context.push('/calls/outgoing', extra: {
+                        'receiverId': otherUserId,
+                        'receiverName': otherName,
+                        'callType': CallType.video,
+                      });
+                      ref.read(callProvider.notifier).startCall(
                         receiverId: otherUserId,
                         receiverName: otherName,
                         type: CallType.video,
                       );
-                      if (context.mounted) {
-                        context.push('/calls/outgoing', extra: {
-                          'receiverId': otherUserId,
-                          'receiverName': otherName,
-                          'callType': CallType.video,
-                        });
-                      }
                     },
                     tooltip: 'Video Call',
                   ),
                   IconButton(
-                    icon: const Icon(Icons.call_rounded, color: AppColors.primary),
-                    onPressed: () async {
+                    icon: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.call_rounded, color: AppColors.primary, size: 18),
+                    ),
+                    onPressed: () {
                       if (otherUserId.isEmpty) return;
-                      await ref.read(callProvider.notifier).startCall(
+                      context.push('/calls/outgoing', extra: {
+                        'receiverId': otherUserId,
+                        'receiverName': otherName,
+                        'callType': CallType.audio,
+                      });
+                      ref.read(callProvider.notifier).startCall(
                         receiverId: otherUserId,
                         receiverName: otherName,
                         type: CallType.audio,
                       );
-                      if (context.mounted) {
-                        context.push('/calls/outgoing', extra: {
-                          'receiverId': otherUserId,
-                          'receiverName': otherName,
-                          'callType': CallType.audio,
-                        });
-                      }
                     },
                     tooltip: 'Voice Call',
                   ),
@@ -305,12 +508,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                                     shape: BoxShape.circle,
                                     boxShadow: AppShadows.floating,
                                   ),
-                                  child: const Icon(Icons.chat_bubble_outline_rounded, size: 56, color: Colors.white),
+                                  child: const Icon(Icons.forum_outlined, size: 56, color: Colors.white),
                                 ),
                                 const SizedBox(height: AppSpacing.lg),
-                                Text('No messages yet', style: AppTextStyles.headlineMedium(context)),
+                                Text('Start the conversation', style: AppTextStyles.headlineMedium(context).copyWith(fontWeight: FontWeight.bold)),
                                 const SizedBox(height: AppSpacing.xs),
-                                Text('Send a message to start conversation', style: AppTextStyles.bodyMedium(context, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                Text('Say hello 👋 to $otherName below', style: AppTextStyles.bodyMedium(context, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                               ],
                             ),
                           );
@@ -323,66 +526,93 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
                           itemCount: docs.length,
                           itemBuilder: (context, index) {
-                            final data = docs[index].data() as Map<String, dynamic>;
+                            final doc = docs[index];
+                            final data = doc.data() as Map<String, dynamic>;
                             final isMe = data['senderId'] == currentUserId;
                             final text = data['text'] ?? '';
+                            final isDeleted = data['isDeleted'] ?? false;
+                            final isEdited = data['isEdited'] ?? false;
                             final timestamp = data['createdAt'] as Timestamp?;
                             final timeStr = timestamp != null
                                 ? '${timestamp.toDate().hour.toString().padLeft(2, '0')}:${timestamp.toDate().minute.toString().padLeft(2, '0')}'
                                 : 'Just now';
 
-                            return Align(
-                              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                              child: Container(
-                                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                                margin: const EdgeInsets.symmetric(vertical: 4),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: isMe
-                                      ? (isDark ? AppColors.darkSenderBubble : AppColors.lightSenderBubble)
-                                      : (isDark ? AppColors.darkReceiverBubble : AppColors.lightReceiverBubble),
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(AppRadius.lg),
-                                    topRight: const Radius.circular(AppRadius.lg),
-                                    bottomLeft: Radius.circular(isMe ? AppRadius.lg : 4),
-                                    bottomRight: Radius.circular(isMe ? 4 : AppRadius.lg),
-                                  ),
-                                  boxShadow: AppShadows.lightSubtle,
-                                  border: Border.all(
-                                    color: isMe
-                                        ? Colors.transparent
-                                        : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      text,
-                                      style: AppTextStyles.bodyLarge(context).copyWith(
-                                        color: isMe && !isDark ? AppColors.lightTextPrimary : null,
-                                        height: 1.3,
+                            return GestureDetector(
+                              onLongPress: isMe && !isDeleted ? () => _showOptions(context, doc) : null,
+                              child: Align(
+                                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                child: Container(
+                                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+                                  margin: const EdgeInsets.symmetric(vertical: 5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    gradient: isMe && !isDeleted ? AppGradients.primary : null,
+                                    color: isMe && !isDeleted
+                                        ? null
+                                        : (isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurface),
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(AppRadius.xl),
+                                      topRight: const Radius.circular(AppRadius.xl),
+                                      bottomLeft: Radius.circular(isMe ? AppRadius.xl : 4),
+                                      bottomRight: Radius.circular(isMe ? 4 : AppRadius.xl),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: isMe && !isDeleted
+                                            ? AppColors.primary.withOpacity(0.2)
+                                            : Colors.black.withOpacity(0.04),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 3),
                                       ),
+                                    ],
+                                    border: Border.all(
+                                      color: isMe
+                                          ? Colors.transparent
+                                          : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                                      width: 1,
                                     ),
-                                    const SizedBox(height: AppSpacing.xxs),
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          timeStr,
-                                          style: AppTextStyles.caption(
-                                            context,
-                                            color: isMe && !isDark ? AppColors.lightTextSecondary : null,
-                                          ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        text,
+                                        style: AppTextStyles.bodyLarge(context).copyWith(
+                                          color: isDeleted
+                                              ? (isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted)
+                                              : (isMe ? Colors.white : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary)),
+                                          fontStyle: isDeleted ? FontStyle.italic : FontStyle.normal,
+                                          height: 1.35,
                                         ),
-                                        if (isMe) ...[
-                                          const SizedBox(width: AppSpacing.xxs),
-                                          const Icon(Icons.done_all_rounded, size: 14, color: AppColors.readReceiptBlue),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (isEdited && !isDeleted) ...[
+                                            Text(
+                                              'edited · ',
+                                              style: AppTextStyles.caption(
+                                                context,
+                                                color: isMe ? Colors.white.withOpacity(0.7) : (isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted),
+                                              ).copyWith(fontSize: 10),
+                                            ),
+                                          ],
+                                          Text(
+                                            timeStr,
+                                            style: AppTextStyles.caption(
+                                              context,
+                                              color: isMe ? Colors.white.withOpacity(0.8) : (isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted),
+                                            ).copyWith(fontSize: 11),
+                                          ),
+                                          if (isMe && !isDeleted) ...[
+                                            const SizedBox(width: 4),
+                                            const Icon(Icons.done_all_rounded, size: 14, color: Colors.white),
+                                          ],
                                         ],
-                                      ],
-                                    ),
-                                  ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
@@ -391,19 +621,26 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                       },
                     ),
                   ),
+
+                  // Floating Modern Message Composer Bar
                   Container(
-                    padding: const EdgeInsets.all(AppSpacing.md),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm + 2),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      boxShadow: AppShadows.lightSubtle,
+                      color: isDark ? AppColors.darkSurface : Colors.white,
+                      boxShadow: AppShadows.floating,
+                      border: Border(
+                        top: BorderSide(
+                          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                        ),
+                      ),
                     ),
                     child: SafeArea(
                       child: Row(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.emoji_emotions_outlined, color: AppColors.primary),
-                            onPressed: () {},
-                            tooltip: 'Emoji',
+                            icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary, size: 26),
+                            onPressed: _showAttachmentBottomSheet,
+                            tooltip: 'Share',
                           ),
                           Expanded(
                             child: Container(
@@ -411,12 +648,15 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                               decoration: BoxDecoration(
                                 color: isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant,
                                 borderRadius: BorderRadius.circular(AppRadius.pill),
+                                border: Border.all(
+                                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                                ),
                               ),
                               child: TextField(
                                 controller: _messageController,
                                 textCapitalization: TextCapitalization.sentences,
                                 decoration: const InputDecoration(
-                                  hintText: 'Type a message...',
+                                  hintText: 'Type something...',
                                   border: InputBorder.none,
                                   enabledBorder: InputBorder.none,
                                   focusedBorder: InputBorder.none,
@@ -427,23 +667,28 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.xs),
-                          IconButton(
-                            icon: const Icon(Icons.attach_file_rounded, color: AppColors.primary),
-                            onPressed: _showAttachmentBottomSheet,
-                            tooltip: 'Attach',
-                          ),
-                          const SizedBox(width: AppSpacing.xxs),
-                          Container(
+                          const SizedBox(width: AppSpacing.xs + 2),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
                             decoration: BoxDecoration(
                               gradient: AppGradients.primary,
                               shape: BoxShape.circle,
-                              boxShadow: AppShadows.lightSubtle,
+                              boxShadow: AppShadows.floating,
                             ),
                             child: IconButton(
-                              icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
-                              onPressed: _isSending ? null : _sendMessage,
-                              tooltip: 'Send',
+                              icon: Icon(
+                                _hasText ? Icons.send_rounded : Icons.mic_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                if (_hasText) {
+                                  _sendMessage();
+                                } else {
+                                  _sendCustomMessage('🎤 Voice note', type: 'voice');
+                                }
+                              },
+                              tooltip: _hasText ? 'Send' : 'Voice Message',
                             ),
                           ),
                         ],

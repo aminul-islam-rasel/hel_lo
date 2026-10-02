@@ -9,6 +9,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_shadows.dart';
 import '../../../core/theme/app_gradients.dart';
+import '../../../core/services/notification_service.dart';
 import '../../chat/presentation/chat_list_screen.dart';
 import '../../status/presentation/status_screen.dart';
 import '../../calls/presentation/calls_screen.dart';
@@ -26,6 +27,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
   StreamSubscription? _incomingCallSubscription;
+  StreamSubscription? _incomingMessageSubscription;
 
   final List<Widget> _screens = const [
     ChatListScreen(),
@@ -38,6 +40,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _listenToIncomingCalls();
+    _listenToIncomingMessages();
   }
 
   void _listenToIncomingCalls() {
@@ -70,84 +73,193 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  void _listenToIncomingMessages() {
+    final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    _incomingMessageSubscription = FirebaseFirestore.instance
+        .collection('conversations')
+        .where('memberIds', arrayContains: currentUserId)
+        .snapshots()
+        .listen(
+      (snapshot) {
+        for (var change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.modified || change.type == DocumentChangeType.added) {
+            final data = change.doc.data();
+            if (data != null) {
+              final lastSenderId = data['lastMessageSenderId'];
+              final lastMessage = data['lastMessage'] ?? 'New message';
+
+              if (lastSenderId != null && lastSenderId != currentUserId) {
+                final lastTime = (data['lastMessageTime'] as Timestamp?)?.toDate();
+                if (lastTime != null && DateTime.now().difference(lastTime).inSeconds < 10) {
+                  FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(lastSenderId)
+                      .get()
+                      .then((doc) {
+                    final senderName = doc.data()?['displayName'] ?? 'Hel Lo Message';
+                    NotificationService.showLocalNotification(
+                      title: senderName,
+                      body: lastMessage,
+                    );
+                  }).catchError((e) {
+                    debugPrint('Error fetching sender profile for notification: $e');
+                  });
+                }
+              }
+            }
+          }
+        }
+      },
+      onError: (error) {
+        debugPrint('Incoming message listener error: $error');
+      },
+    );
+  }
+
   @override
   void dispose() {
     _incomingCallSubscription?.cancel();
+    _incomingMessageSubscription?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      extendBody: true,
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: AppShadows.lightSubtle,
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm,
+          ),
+          child: Container(
+            height: 68,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.darkSurface.withOpacity(0.92)
+                  : Colors.white.withOpacity(0.92),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: Border.all(
+                color: isDark
+                    ? AppColors.darkBorder
+                    : AppColors.primary.withOpacity(0.12),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isDark
+                      ? Colors.black.withOpacity(0.4)
+                      : AppColors.primary.withOpacity(0.12),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildNavItem(0, 'Chats', Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded),
+                _buildNavItem(1, 'Stories', Icons.auto_awesome_outlined, Icons.auto_awesome_rounded),
+                _buildNavItem(2, 'Calls', Icons.phone_outlined, Icons.phone_rounded),
+                _buildNavItem(3, 'Settings', Icons.person_outline_rounded, Icons.person_rounded),
+              ],
+            ),
+          ),
         ),
-        child: NavigationBar(
-          selectedIndex: _currentIndex,
-          onDestinationSelected: (index) => setState(() => _currentIndex = index),
-          animationDuration: const Duration(milliseconds: 400),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.chat_bubble_outline_rounded),
-              selectedIcon: Icon(Icons.chat_bubble_rounded),
-              label: 'Chats',
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: _currentIndex == 0 || _currentIndex == 1
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 76.0),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                decoration: BoxDecoration(
+                  gradient: AppGradients.primary,
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                  boxShadow: AppShadows.floating,
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    onTap: () {
+                      if (_currentIndex == 0) {
+                        context.push('/contacts');
+                      } else {
+                        context.push('/status/create');
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Icon(
+                        _currentIndex == 0 ? Icons.add_comment_rounded : Icons.camera_alt_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildNavItem(int index, String label, IconData icon, IconData selectedIcon) {
+    final isSelected = _currentIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: () => setState(() => _currentIndex = index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? AppColors.primary.withOpacity(0.2) : AppColors.primary.withOpacity(0.12))
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? selectedIcon : icon,
+              size: 22,
+              color: isSelected
+                  ? AppColors.primary
+                  : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.donut_large_outlined),
-              selectedIcon: Icon(Icons.donut_large_rounded),
-              label: 'Status',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.call_outlined),
-              selectedIcon: Icon(Icons.call_rounded),
-              label: 'Calls',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings_rounded),
-              label: 'Settings',
-            ),
+            if (isSelected) ...[
+              const SizedBox(width: AppSpacing.xs + 2),
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
+                opacity: isSelected ? 1.0 : 0.0,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
-      floatingActionButton: _currentIndex == 0
-          ? Container(
-              decoration: BoxDecoration(
-                gradient: AppGradients.primary,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                boxShadow: AppShadows.floating,
-              ),
-              child: FloatingActionButton(
-                backgroundColor: Colors.transparent,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
-                onPressed: () => context.push('/contacts'),
-                child: const Icon(Icons.edit_rounded, size: 22),
-              ),
-            )
-          : _currentIndex == 1
-              ? Container(
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.primary,
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                    boxShadow: AppShadows.floating,
-                  ),
-                  child: FloatingActionButton(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
-                    onPressed: () => context.push('/status/create'),
-                    child: const Icon(Icons.camera_alt_rounded, size: 22),
-                  ),
-                )
-              : null,
     );
   }
 }

@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_radius.dart';
+import '../../../core/theme/app_shadows.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../core/widgets/app_loading_widget.dart';
 
@@ -22,11 +24,11 @@ class _CreateStatusScreenState extends ConsumerState<CreateStatusScreen> {
 
   final List<Color> _colors = [
     AppColors.primary,
-    Colors.indigo,
-    Colors.deepPurple,
-    Colors.pink,
-    Colors.teal,
-    Colors.blueGrey,
+    const Color(0xFF4338CA),
+    const Color(0xFF8B5CF6),
+    const Color(0xFFEC4899),
+    const Color(0xFF10B981),
+    const Color(0xFF0F172A),
   ];
 
   @override
@@ -60,14 +62,14 @@ class _CreateStatusScreenState extends ConsumerState<CreateStatusScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Status posted successfully!')),
+          const SnackBar(content: Text('Story posted successfully!')),
         );
         context.pop();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to post status: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text('Failed to post story: $e'), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -106,9 +108,11 @@ class _CreateStatusScreenState extends ConsumerState<CreateStatusScreen> {
             autofocus: true,
             maxLines: 5,
             textAlign: TextAlign.center,
-            style: AppTextStyles.displayLarge(context, color: Colors.white),
+            style: AppTextStyles.displayLarge(context, color: Colors.white).copyWith(
+              fontWeight: FontWeight.bold,
+            ),
             decoration: const InputDecoration(
-              hintText: 'Type a status...',
+              hintText: 'Share a thought...',
               hintStyle: TextStyle(color: Colors.white60),
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
@@ -118,20 +122,26 @@ class _CreateStatusScreenState extends ConsumerState<CreateStatusScreen> {
           ),
         ),
       ),
-      bottomSheet: Container(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        color: Colors.black26,
-        child: SafeArea(
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              FloatingActionButton(
-                backgroundColor: Colors.white,
-                foregroundColor: _backgroundColor,
-                onPressed: _isPosting ? null : _postStatus,
-                child: _isPosting
-                    ? AppLoadingWidget.small(color: _backgroundColor)
-                    : const Icon(Icons.send_rounded),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  boxShadow: AppShadows.floating,
+                ),
+                child: FloatingActionButton(
+                  backgroundColor: Colors.white,
+                  foregroundColor: _backgroundColor,
+                  elevation: 0,
+                  onPressed: _isPosting ? null : _postStatus,
+                  child: _isPosting
+                      ? AppLoadingWidget.small(color: _backgroundColor)
+                      : const Icon(Icons.send_rounded),
+                ),
               ),
             ],
           ),

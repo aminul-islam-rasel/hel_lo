@@ -15,6 +15,7 @@ class UserModel {
   final String? pushToken;
   final Map<String, dynamic> privacySettings;
   final Map<String, dynamic> notificationSettings;
+  final List<String> blockedUserIds;
 
   UserModel({
     required this.uid,
@@ -31,6 +32,7 @@ class UserModel {
     this.pushToken,
     required this.privacySettings,
     required this.notificationSettings,
+    required this.blockedUserIds,
   });
 
   Map<String, dynamic> toMap() {
@@ -49,6 +51,7 @@ class UserModel {
       'pushToken': pushToken,
       'privacySettings': privacySettings,
       'notificationSettings': notificationSettings,
+      'blockedUserIds': blockedUserIds,
     };
   }
 
@@ -59,7 +62,7 @@ class UserModel {
       displayName: map['displayName'] ?? '',
       username: map['username'] ?? '',
       profilePhoto: map['profilePhoto'],
-      about: map['about'] ?? 'Hey there! I am using WhatsApp.',
+      about: map['about'] ?? 'Hey there! I am using Hel Lo.',
       status: map['status'] ?? 'Available',
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       lastSeen: (map['lastSeen'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -77,6 +80,7 @@ class UserModel {
         'vibrate': true,
         'preview': true,
       },
+      blockedUserIds: List<String>.from(map['blockedUserIds'] ?? []),
     );
   }
 }

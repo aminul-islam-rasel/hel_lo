@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_shadows.dart';
 import '../../../core/theme/app_gradients.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../core/widgets/app_loading_widget.dart';
@@ -53,7 +52,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   }
 
   Future<void> _checkAuth() async {
-    await Future.delayed(const Duration(milliseconds: 2400));
+    await Future.delayed(const Duration(milliseconds: 2200));
     if (!mounted) return;
 
     try {
@@ -78,8 +77,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: isDark
-                ? [AppColors.darkBackground, AppColors.darkSurface, AppColors.darkBackground]
-                : [AppColors.primaryDark, AppColors.primary, AppColors.primaryLight],
+                ? [AppColors.darkBackground, const Color(0xFF1E1B4B), AppColors.darkBackground]
+                : [const Color(0xFF312E81), AppColors.primary, const Color(0xFF818CF8)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -98,19 +97,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                       return Container(
                         padding: const EdgeInsets.all(28),
                         decoration: BoxDecoration(
-                          color: isDark ? AppColors.darkElevatedSurface : Colors.white,
+                          color: isDark ? AppColors.darkSurface : Colors.white,
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.4 * _glowAnimation.value),
-                              blurRadius: 30 * _glowAnimation.value,
-                              spreadRadius: 10 * _glowAnimation.value,
+                              color: AppColors.secondary.withOpacity(0.5 * _glowAnimation.value),
+                              blurRadius: 36 * _glowAnimation.value,
+                              spreadRadius: 8 * _glowAnimation.value,
                             ),
                           ],
                         ),
                         child: const Icon(
-                          Icons.chat_bubble_rounded,
-                          size: 76,
+                          Icons.forum_rounded,
+                          size: 72,
                           color: AppColors.primary,
                         ),
                       );
@@ -120,16 +119,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                   Text(
                     'Hel Lo',
                     style: AppTextStyles.displayLarge(context, color: Colors.white).copyWith(
-                      fontSize: 38,
-                      letterSpacing: -1,
+                      fontSize: 42,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1.2,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Next-Gen Secure Messaging Experience',
-                    style: AppTextStyles.bodyMedium(context, color: Colors.white.withOpacity(0.85)),
+                    'Next-Gen Communication Experience',
+                    style: AppTextStyles.bodyMedium(context, color: Colors.white.withOpacity(0.85)).copyWith(
+                      letterSpacing: 0.2,
+                    ),
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 52),
                   const AppLoadingWidget.small(color: Colors.white),
                 ],
               ),

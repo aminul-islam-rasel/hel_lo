@@ -7,6 +7,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_shadows.dart';
 import '../../../core/theme/app_gradients.dart';
 import '../../../core/theme/text_styles.dart';
@@ -86,14 +87,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   Future<void> _openChat(BuildContext context, String targetUid) async {
     try {
       final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
-      if (currentUserId == null || targetUid.isEmpty) {
-        debugPrint('Cannot open chat: currentUserId=$currentUserId, targetUid=$targetUid');
-        return;
-      }
+      if (currentUserId == null || targetUid.isEmpty) return;
 
       final conversationId = ConversationUtils.generateConversationId(currentUserId, targetUid);
-      debugPrint('Opening chat: conversationId=$conversationId, currentUserId=$currentUserId, targetUid=$targetUid');
-
       final convRef = FirebaseFirestore.instance.collection('conversations').doc(conversationId);
       final convDoc = await convRef.get();
 
@@ -112,7 +108,6 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
         context.push('/chat/$conversationId');
       }
     } catch (e) {
-      debugPrint('Error opening chat: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to open chat: $e'), backgroundColor: AppColors.error),
@@ -125,19 +120,20 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   Widget build(BuildContext context) {
     final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Select Contact', style: AppTextStyles.headlineLarge(context).copyWith(fontSize: 22)),
+            Text('Find People', style: AppTextStyles.headlineLarge(context).copyWith(fontSize: 22, fontWeight: FontWeight.bold)),
             Text('Contacts on Hel Lo', style: AppTextStyles.caption(context, color: theme.colorScheme.onSurfaceVariant)),
           ],
         ),
       ),
       body: _isLoadingContacts
-          ? const Center(child: AppLoadingWidget(message: 'Syncing phone contacts...'))
+          ? const Center(child: AppLoadingWidget(message: 'Syncing device contacts...'))
           : !_permissionGranted
               ? Center(
                   child: Padding(
@@ -145,20 +141,37 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.contacts_rounded, size: 64, color: AppColors.primary),
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.contacts_rounded, size: 56, color: AppColors.primary),
+                        ),
                         const SizedBox(height: AppSpacing.lg),
-                        Text('Permission Required', style: AppTextStyles.headlineMedium(context)),
+                        Text('Contacts Permission Needed', style: AppTextStyles.headlineMedium(context).copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: AppSpacing.sm),
                         Text(
-                          'Please grant contacts permission to find your friends on Hel Lo.',
+                          'Allow access to your contacts to discover who is on Hel Lo.',
                           textAlign: TextAlign.center,
                           style: AppTextStyles.bodyMedium(context, color: theme.colorScheme.onSurfaceVariant),
                         ),
                         const SizedBox(height: AppSpacing.xl),
-                        ElevatedButton(
-                          onPressed: _loadDeviceContacts,
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-                          child: const Text('Grant Permission'),
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: AppGradients.primary,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            boxShadow: AppShadows.floating,
+                          ),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                            ),
+                            onPressed: _loadDeviceContacts,
+                            child: const Text('Grant Access'),
+                          ),
                         ),
                       ],
                     ),
@@ -172,7 +185,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                     }
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                       return Center(
-                        child: Text('No users found on server.', style: AppTextStyles.bodyMedium(context)),
+                        child: Text('No users found.', style: AppTextStyles.bodyMedium(context)),
                       );
                     }
 
@@ -204,7 +217,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                                 child: const Icon(Icons.person_search_rounded, size: 56, color: Colors.white),
                               ),
                               const SizedBox(height: AppSpacing.xl),
-                              Text('No contacts on Hel Lo', style: AppTextStyles.headlineMedium(context).copyWith(fontWeight: FontWeight.bold)),
+                              Text('No Contacts Found', style: AppTextStyles.headlineMedium(context).copyWith(fontWeight: FontWeight.bold)),
                               const SizedBox(height: AppSpacing.xs),
                               Text('None of your phone contacts are registered on Hel Lo yet.', textAlign: TextAlign.center, style: AppTextStyles.bodyMedium(context, color: theme.colorScheme.onSurfaceVariant)),
                             ],
@@ -213,10 +226,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                       );
                     }
 
-                    return ListView.separated(
+                    return ListView.builder(
                       itemCount: users.length,
-                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                      separatorBuilder: (context, index) => const Divider(indent: 84, height: 1),
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.lg),
                       itemBuilder: (context, index) {
                         final userDoc = users[index];
                         final user = userDoc.data() as Map<String, dynamic>;
@@ -225,50 +237,73 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                         final about = user['about'] ?? 'Available';
                         final isOnline = user['isOnline'] ?? false;
 
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
-                          leading: Stack(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  gradient: isOnline ? AppGradients.statusRing : null,
-                                  color: isOnline ? null : AppColors.primary.withOpacity(0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const CircleAvatar(
-                                  radius: 26,
-                                  backgroundColor: AppColors.primary,
-                                  child: Icon(Icons.person_rounded, color: Colors.white, size: 28),
-                                ),
-                              ),
-                              if (isOnline)
-                                Positioned(
-                                  bottom: 2,
-                                  right: 2,
-                                  child: Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.online,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: theme.scaffoldBackgroundColor, width: 2),
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                          child: Container(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+                              borderRadius: BorderRadius.circular(AppRadius.xl),
+                              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                Stack(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        gradient: isOnline ? AppGradients.statusRing : null,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const CircleAvatar(
+                                        radius: 26,
+                                        backgroundColor: AppColors.primary,
+                                        child: Icon(Icons.person_rounded, color: Colors.white, size: 28),
+                                      ),
                                     ),
+                                    if (isOnline)
+                                      Positioned(
+                                        bottom: 2,
+                                        right: 2,
+                                        child: Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.online,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: theme.scaffoldBackgroundColor, width: 2),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(name, style: AppTextStyles.titleMedium(context).copyWith(fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 2),
+                                      Text(about, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.bodySmall(context, color: theme.colorScheme.onSurfaceVariant)),
+                                    ],
                                   ),
                                 ),
-                            ],
-                          ),
-                          title: Text(name, style: AppTextStyles.titleMedium(context).copyWith(fontWeight: FontWeight.w600)),
-                          subtitle: Text(about, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.bodySmall(context)),
-                          trailing: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.12),
-                              shape: BoxShape.circle,
+                                IconButton(
+                                  icon: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      gradient: AppGradients.primary,
+                                      shape: BoxShape.circle,
+                                      boxShadow: AppShadows.floating,
+                                    ),
+                                    child: const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 18),
+                                  ),
+                                  onPressed: () => _openChat(context, uid),
+                                ),
+                              ],
                             ),
-                            child: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary, size: 20),
                           ),
-                          onTap: () => _openChat(context, uid),
                         );
                       },
                     );

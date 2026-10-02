@@ -69,20 +69,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant,
               borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
             ),
             child: TextField(
               controller: _searchController,
               autofocus: true,
               style: AppTextStyles.bodyLarge(context),
               decoration: InputDecoration(
-                hintText: 'Search contacts & users...',
+                hintText: 'Search people, username, phone...',
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 filled: false,
                 suffixIcon: _query.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 20),
+                        icon: const Icon(Icons.clear_rounded, size: 20, color: AppColors.primary),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _query = '');
@@ -102,16 +103,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'RECENT SEARCHES',
-                    style: AppTextStyles.caption(context, color: AppColors.primary).copyWith(fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                    'QUICK SEARCH',
+                    style: AppTextStyles.caption(context, color: AppColors.primary).copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Wrap(
                     spacing: AppSpacing.sm,
                     runSpacing: AppSpacing.sm,
                     children: [
-                      _buildRecentChip('John'),
                       _buildRecentChip('Alex'),
+                      _buildRecentChip('Sarah'),
+                      _buildRecentChip('John'),
                     ],
                   ),
                 ],
@@ -121,7 +126,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               stream: FirebaseFirestore.instance.collection('users').snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: AppLoadingWidget(message: 'Searching...'));
+                  return const Center(child: AppLoadingWidget(message: 'Searching people...'));
                 }
 
                 final docs = snapshot.data?.docs ?? [];
@@ -152,46 +157,95 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               shape: BoxShape.circle,
                               boxShadow: AppShadows.floating,
                             ),
-                            child: const Icon(Icons.search_rounded, size: 56, color: Colors.white),
+                            child: const Icon(Icons.person_search_rounded, size: 56, color: Colors.white),
                           ),
                           const SizedBox(height: AppSpacing.xl),
-                          Text('No results for "$_query"', style: AppTextStyles.headlineMedium(context).copyWith(fontWeight: FontWeight.bold)),
+                          Text('No matches for "$_query"', style: AppTextStyles.headlineMedium(context).copyWith(fontWeight: FontWeight.bold)),
                           const SizedBox(height: AppSpacing.sm),
-                          Text('Try searching with a different name or number', style: AppTextStyles.bodyMedium(context, color: theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
+                          Text('Check your spelling or search by phone number.', style: AppTextStyles.bodyMedium(context, color: theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
                         ],
                       ),
                     ),
                   );
                 }
 
-                return ListView.separated(
+                return ListView.builder(
                   itemCount: filtered.length,
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  separatorBuilder: (context, index) => const Divider(indent: 84, height: 1),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.lg),
                   itemBuilder: (context, index) {
                     final data = filtered[index].data() as Map<String, dynamic>;
                     final uid = data['uid'] ?? '';
                     final name = data['displayName'] ?? 'User';
                     final about = data['about'] ?? 'Available';
+                    final isOnline = data['isOnline'] ?? false;
 
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
-                      leading: const CircleAvatar(
-                        radius: 26,
-                        backgroundColor: AppColors.primary,
-                        child: Icon(Icons.person_rounded, color: Colors.white, size: 28),
-                      ),
-                      title: Text(name, style: AppTextStyles.titleMedium(context).copyWith(fontWeight: FontWeight.w600)),
-                      subtitle: Text(about, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.bodySmall(context)),
-                      trailing: Container(
-                        padding: const EdgeInsets.all(8),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                      child: Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.12),
-                          shape: BoxShape.circle,
+                          color: isDark ? AppColors.darkCard : AppColors.lightCard,
+                          borderRadius: BorderRadius.circular(AppRadius.xl),
+                          border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
                         ),
-                        child: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary, size: 20),
+                        child: Row(
+                          children: [
+                            Stack(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    gradient: isOnline ? AppGradients.statusRing : null,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const CircleAvatar(
+                                    radius: 26,
+                                    backgroundColor: AppColors.primary,
+                                    child: Icon(Icons.person_rounded, color: Colors.white, size: 28),
+                                  ),
+                                ),
+                                if (isOnline)
+                                  Positioned(
+                                    bottom: 2,
+                                    right: 2,
+                                    child: Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.online,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: theme.scaffoldBackgroundColor, width: 2),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(name, style: AppTextStyles.titleMedium(context).copyWith(fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 2),
+                                  Text(about, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.bodySmall(context, color: theme.colorScheme.onSurfaceVariant)),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  gradient: AppGradients.primary,
+                                  shape: BoxShape.circle,
+                                  boxShadow: AppShadows.floating,
+                                ),
+                                child: const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 18),
+                              ),
+                              onPressed: () => _openChat(uid),
+                            ),
+                          ],
+                        ),
                       ),
-                      onTap: () => _openChat(uid),
                     );
                   },
                 );

@@ -34,6 +34,7 @@ class AppLoadingWidget extends StatefulWidget {
 
 class _AppLoadingWidgetState extends State<AppLoadingWidget> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late Animation<double> _rotationAnimation;
   late Animation<double> _scaleAnimation;
 
   @override
@@ -41,9 +42,10 @@ class _AppLoadingWidgetState extends State<AppLoadingWidget> with SingleTickerPr
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
 
+    _rotationAnimation = Tween<double>(begin: 0, end: 1).animate(_controller);
     _scaleAnimation = Tween<double>(begin: 0.85, end: 1.15).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
@@ -58,11 +60,11 @@ class _AppLoadingWidgetState extends State<AppLoadingWidget> with SingleTickerPr
   double get _dimension {
     switch (widget.size) {
       case AppLoadingSize.small:
-        return 20.0;
+        return 22.0;
       case AppLoadingSize.medium:
-        return 48.0;
+        return 52.0;
       case AppLoadingSize.large:
-        return 72.0;
+        return 76.0;
     }
   }
 
@@ -71,9 +73,9 @@ class _AppLoadingWidgetState extends State<AppLoadingWidget> with SingleTickerPr
       case AppLoadingSize.small:
         return 12.0;
       case AppLoadingSize.medium:
-        return 26.0;
+        return 28.0;
       case AppLoadingSize.large:
-        return 40.0;
+        return 42.0;
     }
   }
 
@@ -81,27 +83,45 @@ class _AppLoadingWidgetState extends State<AppLoadingWidget> with SingleTickerPr
   Widget build(BuildContext context) {
     final activeColor = widget.color ?? AppColors.primary;
 
-    final indicator = ScaleTransition(
-      scale: _scaleAnimation,
-      child: Container(
-        width: _dimension,
-        height: _dimension,
-        decoration: BoxDecoration(
-          color: activeColor.withOpacity(0.12),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: activeColor.withOpacity(0.4),
-            width: widget.size == AppLoadingSize.small ? 1.5 : 2.5,
+    final indicator = Stack(
+      alignment: Alignment.center,
+      children: [
+        RotationTransition(
+          turns: _rotationAnimation,
+          child: Container(
+            width: _dimension,
+            height: _dimension,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: SweepGradient(
+                colors: [
+                  activeColor.withOpacity(0.0),
+                  activeColor.withOpacity(0.3),
+                  activeColor,
+                ],
+              ),
+            ),
           ),
         ),
-        child: Center(
-          child: Icon(
-            Icons.chat_bubble_rounded,
-            size: _iconSize,
-            color: activeColor,
+        ScaleTransition(
+          scale: _scaleAnimation,
+          child: Container(
+            width: _dimension * 0.82,
+            height: _dimension * 0.82,
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Icon(
+                Icons.auto_awesome_rounded,
+                size: _iconSize,
+                color: activeColor,
+              ),
+            ),
           ),
         ),
-      ),
+      ],
     );
 
     if (widget.message != null && widget.message!.isNotEmpty) {
@@ -116,7 +136,8 @@ class _AppLoadingWidgetState extends State<AppLoadingWidget> with SingleTickerPr
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 13,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.2,
             ),
           ),
         ],

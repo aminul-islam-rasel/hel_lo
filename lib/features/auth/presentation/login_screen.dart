@@ -71,7 +71,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       body: SafeArea(
@@ -85,24 +84,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   Center(
                     child: Container(
-                      padding: const EdgeInsets.all(22),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         gradient: AppGradients.primary,
                         shape: BoxShape.circle,
                         boxShadow: AppShadows.floating,
                       ),
-                      child: const Icon(Icons.chat_bubble_rounded, size: 48, color: Colors.white),
+                      child: const Icon(Icons.forum_rounded, size: 52, color: Colors.white),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xxl),
                   Text(
                     'Welcome Back',
-                    style: AppTextStyles.headlineLarge(context).copyWith(fontSize: 28),
+                    style: AppTextStyles.headlineLarge(context).copyWith(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Sign in to continue your secure conversations',
+                    'Sign in to continue your conversations',
                     style: AppTextStyles.bodyMedium(context, color: theme.colorScheme.onSurfaceVariant),
                     textAlign: TextAlign.center,
                   ),
@@ -113,7 +115,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Phone Number',
                       hintText: 'Enter phone number',
-                      prefixIcon: Icon(Icons.phone_outlined, color: AppColors.primary),
+                      prefixIcon: Icon(Icons.phone_iphone_rounded, color: AppColors.primary),
                     ),
                     validator: (value) => value == null || value.isEmpty ? 'Please enter phone number' : null,
                   ),
@@ -136,11 +138,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     validator: (value) => value == null || value.length < 6 ? 'Password must be at least 6 characters' : null,
                   ),
                   const SizedBox(height: AppSpacing.xxl),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _login,
-                    child: _isLoading
-                        ? const AppLoadingWidget.small(color: Colors.white)
-                        : const Text('Sign In'),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: AppGradients.primary,
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      boxShadow: AppShadows.floating,
+                    ),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                      ),
+                      onPressed: _isLoading ? null : _login,
+                      child: _isLoading
+                          ? const AppLoadingWidget.small(color: Colors.white)
+                          : const Text('Sign In'),
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   Row(

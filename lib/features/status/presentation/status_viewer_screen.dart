@@ -32,7 +32,10 @@ class StatusViewerScreen extends ConsumerWidget {
                     padding: const EdgeInsets.all(AppSpacing.xxl),
                     child: Text(
                       text,
-                      style: AppTextStyles.displayLarge(context, color: Colors.white),
+                      style: AppTextStyles.displayLarge(context, color: Colors.white).copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 32,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -48,7 +51,7 @@ class StatusViewerScreen extends ConsumerWidget {
                           1,
                           (index) => Expanded(
                             child: Container(
-                              height: 3,
+                              height: 4,
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -69,8 +72,8 @@ class StatusViewerScreen extends ConsumerWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(userName, style: AppTextStyles.titleMedium(context, color: Colors.white)),
-                              Text('Status update', style: AppTextStyles.caption(context, color: Colors.white70)),
+                              Text(userName, style: AppTextStyles.titleMedium(context, color: Colors.white).copyWith(fontWeight: FontWeight.bold)),
+                              Text('Status story', style: AppTextStyles.caption(context, color: Colors.white70)),
                             ],
                           ),
                           const Spacer(),

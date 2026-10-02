@@ -18,6 +18,7 @@ class VideoCallScreen extends ConsumerStatefulWidget {
 
 class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
   bool _showControls = true;
+  bool _showDebug = false;
 
   String _formatDuration(int seconds) {
     final mins = (seconds ~/ 60).toString().padLeft(2, '0');
@@ -31,7 +32,9 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
     final callNotifier = ref.read(callProvider.notifier);
 
     ref.listen(callProvider, (previous, next) {
-      if (next.currentCall == null || next.currentCall?.status == CallStatus.ended || next.currentCall?.status == CallStatus.rejected) {
+      if (next.currentCall == null ||
+          next.currentCall?.status == CallStatus.ended ||
+          next.currentCall?.status == CallStatus.rejected) {
         if (context.canPop()) {
           context.pop();
         } else {
@@ -49,7 +52,8 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
           children: [
             // Remote Fullscreen Video
             Positioned.fill(
-              child: callNotifier.remoteRenderer != null
+              child: callNotifier.remoteRenderer != null &&
+                      (callState.hasRemoteStream || callNotifier.remoteRenderer!.srcObject != null)
                   ? RTCVideoView(
                       callNotifier.remoteRenderer!,
                       objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
@@ -69,39 +73,86 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                     ),
             ),
 
-            // Top Status & Duration Bar
+            // Top Status & Duration Bar + Debug Toggle
             if (_showControls)
               SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: AppColors.success,
-                                shape: BoxShape.circle,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.success,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: AppSpacing.xs),
-                            Text(
-                              callState.callDuration > 0 ? _formatDuration(callState.callDuration) : 'Connecting...',
-                              style: AppTextStyles.bodyMedium(context, color: Colors.white),
-                            ),
-                          ],
+                              const SizedBox(width: AppSpacing.xs),
+                              Text(
+                                callState.callDuration > 0 ? _formatDuration(callState.callDuration) : 'Connecting...',
+                                style: AppTextStyles.bodyMedium(context, color: Colors.white),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.bug_report_rounded,
+                            color: _showDebug ? AppColors.primary : Colors.white70,
+                            size: 22,
+                          ),
+                          onPressed: () => setState(() => _showDebug = !_showDebug),
+                          tooltip: 'Toggle Debug Info',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+            // Debug Panel
+            if (_showDebug)
+              Positioned(
+                top: 80,
+                left: 16,
+                right: 130,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(color: AppColors.primary, width: 1.5),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('--- WebRTC Debug Info ---', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 4),
+                      Text('Call State: ${callState.currentCall?.status.name ?? "None"}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                      Text('ICE State: ${callState.iceConnectionState?.name ?? "Connecting"}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                      Text('Peer Connection: ${callState.connectionState.name}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                      Text('Local Audio Track: ${callState.hasLocalAudio ? "YES" : "NO"}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                      Text('Local Video Track: ${callState.hasLocalVideo ? "YES" : "NO"}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                      Text('Remote Audio Track: ${callState.hasRemoteAudio ? "YES" : "NO"}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                      Text('Remote Video Track: ${callState.hasRemoteVideo ? "YES" : "NO"}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                      Text('Microphone Enabled: ${!callState.isMuted ? "ON" : "OFF"}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                      Text('Camera Enabled: ${!callState.isCameraOff ? "ON" : "OFF"}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                      Text('Speaker Enabled: ${callState.isSpeakerOn ? "ON" : "OFF"}', style: const TextStyle(color: Colors.white, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -109,10 +160,10 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
 
             // Floating PIP Local Video (Top-Right)
             Positioned(
-              top: 60,
-              right: 20,
-              width: 120,
-              height: 170,
+              top: 70,
+              right: 16,
+              width: 110,
+              height: 160,
               child: GestureDetector(
                 onTap: () => callNotifier.switchCamera(),
                 child: ClipRRect(
@@ -121,7 +172,7 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                     decoration: BoxDecoration(
                       color: Colors.black87,
                       borderRadius: BorderRadius.circular(AppRadius.lg),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 2),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 2),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.5),
@@ -145,61 +196,64 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
 
             // Bottom Glassmorphic Action Bar
             if (_showControls)
-              Positioned(
-                bottom: 40,
-                left: 20,
-                right: 20,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          callState.isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-                          color: callState.isMuted ? Colors.redAccent : Colors.white,
-                          size: 26,
-                        ),
-                        onPressed: () => callNotifier.toggleMute(),
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xl, left: AppSpacing.xl, right: AppSpacing.xl),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                       ),
-                      IconButton(
-                        icon: Icon(
-                          callState.isCameraOff ? Icons.videocam_off_rounded : Icons.videocam_rounded,
-                          color: callState.isCameraOff ? Colors.redAccent : Colors.white,
-                          size: 26,
-                        ),
-                        onPressed: () => callNotifier.toggleCamera(),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              callState.isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                              color: callState.isMuted ? Colors.redAccent : Colors.white,
+                              size: 26,
+                            ),
+                            onPressed: () => callNotifier.toggleMute(),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              callState.isCameraOff ? Icons.videocam_off_rounded : Icons.videocam_rounded,
+                              color: callState.isCameraOff ? Colors.redAccent : Colors.white,
+                              size: 26,
+                            ),
+                            onPressed: () => callNotifier.toggleCamera(),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.cameraswitch_rounded,
+                              color: Colors.white,
+                              size: 26,
+                            ),
+                            onPressed: () => callNotifier.switchCamera(),
+                          ),
+                          FloatingActionButton(
+                            heroTag: 'video_end_btn',
+                            elevation: 4,
+                            backgroundColor: AppColors.error,
+                            foregroundColor: Colors.white,
+                            shape: const CircleBorder(),
+                            onPressed: () {
+                              callNotifier.endCall();
+                              if (context.canPop()) {
+                                context.pop();
+                              } else {
+                                context.go('/home');
+                              }
+                            },
+                            child: const Icon(Icons.call_end_rounded, size: 28),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.cameraswitch_rounded,
-                          color: Colors.white,
-                          size: 26,
-                        ),
-                        onPressed: () => callNotifier.switchCamera(),
-                      ),
-                      FloatingActionButton(
-                        heroTag: 'video_end_btn',
-                        elevation: 4,
-                        backgroundColor: AppColors.error,
-                        foregroundColor: Colors.white,
-                        shape: const CircleBorder(),
-                        onPressed: () {
-                          callNotifier.endCall();
-                          if (context.canPop()) {
-                            context.pop();
-                          } else {
-                            context.go('/home');
-                          }
-                        },
-                        child: const Icon(Icons.call_end_rounded, size: 28),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),

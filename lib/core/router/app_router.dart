@@ -27,124 +27,247 @@ import '../../features/calls/presentation/incoming_call_screen.dart';
 import '../../features/calls/domain/entities/call.dart';
 import '../../features/profile/presentation/user_profile_screen.dart';
 
+CustomTransitionPage<T> _fadeSlidePage<T>({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final tween = Tween<Offset>(
+        begin: const Offset(0.05, 0),
+        end: Offset.zero,
+      ).chain(CurveTween(curve: Curves.easeOutCubic));
+
+      return SlideTransition(
+        position: animation.drive(tween),
+        child: FadeTransition(
+          opacity: animation,
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
     routes: [
       GoRoute(
         path: '/splash',
-        builder: (context, state) => const SplashScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const SplashScreen(),
+        ),
       ),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const OnboardingScreen(),
+        ),
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const LoginScreen(),
+        ),
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const RegisterScreen(),
+        ),
       ),
       GoRoute(
         path: '/home',
-        builder: (context, state) => const HomeScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const HomeScreen(),
+        ),
       ),
       GoRoute(
         path: '/chat/requests',
-        builder: (context, state) => const MessageRequestsScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const MessageRequestsScreen(),
+        ),
       ),
       GoRoute(
         path: '/chat/:conversationId',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final conversationId = state.pathParameters['conversationId'] ?? '';
-          return ChatDetailScreen(conversationId: conversationId);
+          return _fadeSlidePage(
+            context: context,
+            state: state,
+            child: ChatDetailScreen(conversationId: conversationId),
+          );
         },
       ),
       GoRoute(
         path: '/contacts',
-        builder: (context, state) => const ContactsScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const ContactsScreen(),
+        ),
       ),
       GoRoute(
         path: '/search',
-        builder: (context, state) => const SearchScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const SearchScreen(),
+        ),
       ),
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const SettingsScreen(),
+        ),
       ),
       GoRoute(
         path: '/settings/profile',
-        builder: (context, state) => const ProfileEditScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const ProfileEditScreen(),
+        ),
       ),
       GoRoute(
         path: '/settings/privacy',
-        builder: (context, state) => const PrivacyScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const PrivacyScreen(),
+        ),
       ),
       GoRoute(
         path: '/settings/notifications',
-        builder: (context, state) => const NotificationsSettingsScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const NotificationsSettingsScreen(),
+        ),
       ),
       GoRoute(
         path: '/settings/storage',
-        builder: (context, state) => const StorageScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const StorageScreen(),
+        ),
       ),
       GoRoute(
         path: '/settings/blocked',
-        builder: (context, state) => const BlockedUsersScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const BlockedUsersScreen(),
+        ),
       ),
       GoRoute(
         path: '/settings/help',
-        builder: (context, state) => const HelpScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const HelpScreen(),
+        ),
       ),
       GoRoute(
         path: '/settings/about',
-        builder: (context, state) => const AboutScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const AboutScreen(),
+        ),
       ),
       GoRoute(
         path: '/status/create',
-        builder: (context, state) => const CreateStatusScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const CreateStatusScreen(),
+        ),
       ),
       GoRoute(
         path: '/status/viewer/:statusId',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final statusId = state.pathParameters['statusId'] ?? '';
-          return StatusViewerScreen(statusId: statusId);
+          return _fadeSlidePage(
+            context: context,
+            state: state,
+            child: StatusViewerScreen(statusId: statusId),
+          );
         },
       ),
       GoRoute(
         path: '/calls/outgoing',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
-          return OutgoingCallScreen(
-            receiverId: extra?['receiverId'] ?? '',
-            receiverName: extra?['receiverName'] ?? 'User',
-            receiverPhoto: extra?['receiverPhoto'],
-            callType: extra?['callType'] ?? CallType.audio,
+          return _fadeSlidePage(
+            context: context,
+            state: state,
+            child: OutgoingCallScreen(
+              receiverId: extra?['receiverId'] ?? '',
+              receiverName: extra?['receiverName'] ?? 'User',
+              receiverPhoto: extra?['receiverPhoto'],
+              callType: extra?['callType'] ?? CallType.audio,
+            ),
           );
         },
       ),
       GoRoute(
         path: '/calls/incoming',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final call = state.extra as Call;
-          return IncomingCallScreen(call: call);
+          return _fadeSlidePage(
+            context: context,
+            state: state,
+            child: IncomingCallScreen(call: call),
+          );
         },
       ),
       GoRoute(
         path: '/calls/audio',
-        builder: (context, state) => const AudioCallScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const AudioCallScreen(),
+        ),
       ),
       GoRoute(
         path: '/calls/video',
-        builder: (context, state) => const VideoCallScreen(),
+        pageBuilder: (context, state) => _fadeSlidePage(
+          context: context,
+          state: state,
+          child: const VideoCallScreen(),
+        ),
       ),
       GoRoute(
         path: '/profile/:userId',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final userId = state.pathParameters['userId'] ?? '';
-          return UserProfileScreen(userId: userId);
+          return _fadeSlidePage(
+            context: context,
+            state: state,
+            child: UserProfileScreen(userId: userId),
+          );
         },
       ),
     ],

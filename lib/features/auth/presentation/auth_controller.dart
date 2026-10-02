@@ -154,6 +154,7 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
             'vibrate': true,
             'preview': true,
           },
+          blockedUserIds: [],
         );
 
         await _firestore.collection('users').doc(user.uid).set(userModel.toMap());
@@ -217,6 +218,22 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     } catch (e) {
       rethrow;
     }
+  }
+
+  Future<void> blockUser(String targetUserId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    await _firestore.collection('users').doc(uid).update({
+      'blockedUserIds': FieldValue.arrayUnion([targetUserId]),
+    });
+  }
+
+  Future<void> unblockUser(String targetUserId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    await _firestore.collection('users').doc(uid).update({
+      'blockedUserIds': FieldValue.arrayRemove([targetUserId]),
+    });
   }
 }
 

@@ -22,7 +22,7 @@ class AppTheme {
       foregroundColor: AppColors.lightTextPrimary,
       elevation: 0,
       centerTitle: false,
-      scrolledUnderElevation: 2,
+      scrolledUnderElevation: 1,
       shadowColor: Colors.black12,
     ),
     dividerTheme: const DividerThemeData(
@@ -117,7 +117,7 @@ class AppTheme {
       foregroundColor: AppColors.darkTextPrimary,
       elevation: 0,
       centerTitle: false,
-      scrolledUnderElevation: 2,
+      scrolledUnderElevation: 1,
       shadowColor: Colors.black45,
     ),
     dividerTheme: const DividerThemeData(

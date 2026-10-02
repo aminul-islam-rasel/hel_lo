@@ -96,19 +96,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 children: [
                   Center(
                     child: Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(22),
                       decoration: BoxDecoration(
                         gradient: AppGradients.primary,
                         shape: BoxShape.circle,
                         boxShadow: AppShadows.floating,
                       ),
-                      child: const Icon(Icons.person_add_rounded, size: 40, color: Colors.white),
+                      child: const Icon(Icons.person_add_alt_1_rounded, size: 44, color: Colors.white),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   Text(
                     'Create Account',
-                    style: AppTextStyles.headlineLarge(context).copyWith(fontSize: 28),
+                    style: AppTextStyles.headlineLarge(context).copyWith(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.xs),
@@ -144,7 +147,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Phone Number',
                       hintText: 'Enter phone number',
-                      prefixIcon: Icon(Icons.phone_outlined, color: AppColors.primary),
+                      prefixIcon: Icon(Icons.phone_iphone_rounded, color: AppColors.primary),
                     ),
                     validator: (value) => value == null || value.isEmpty ? 'Please enter phone number' : null,
                   ),
@@ -167,11 +170,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     validator: (value) => value == null || value.length < 6 ? 'Password must be at least 6 characters' : null,
                   ),
                   const SizedBox(height: AppSpacing.xxl),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _register,
-                    child: _isLoading
-                        ? const AppLoadingWidget.small(color: Colors.white)
-                        : const Text('Create Account'),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: AppGradients.primary,
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      boxShadow: AppShadows.floating,
+                    ),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                      ),
+                      onPressed: _isLoading ? null : _register,
+                      child: _isLoading
+                          ? const AppLoadingWidget.small(color: Colors.white)
+                          : const Text('Create Account'),
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   Row(

@@ -39,17 +39,21 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen> with Si
   @override
   Widget build(BuildContext context) {
     ref.listen(callProvider, (previous, next) {
-      if (next.currentCall == null || next.currentCall?.status == CallStatus.ended || next.currentCall?.status == CallStatus.rejected) {
-        if (context.canPop()) {
-          context.pop();
-        } else {
-          context.go('/home');
-        }
-      } else if (next.currentCall?.status == CallStatus.connected || next.currentCall?.status == CallStatus.accepted) {
+      final prevStatus = previous?.currentCall?.status;
+      final nextStatus = next.currentCall?.status;
+
+      if (nextStatus == CallStatus.connected || nextStatus == CallStatus.accepted) {
         if (widget.call.type == CallType.video) {
           context.go('/calls/video');
         } else {
           context.go('/calls/audio');
+        }
+      } else if (prevStatus != null &&
+          (next.currentCall == null || nextStatus == CallStatus.ended || nextStatus == CallStatus.rejected || nextStatus == CallStatus.cancelled)) {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/home');
         }
       }
     });

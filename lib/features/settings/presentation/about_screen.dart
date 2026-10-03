@@ -39,7 +39,7 @@ class AboutScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.12),
+                  color: AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text('Version 2.0.0 (Original Redesign)', style: AppTextStyles.caption(context, color: AppColors.primary).copyWith(fontWeight: FontWeight.bold)),

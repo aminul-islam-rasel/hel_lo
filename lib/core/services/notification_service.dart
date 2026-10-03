@@ -7,6 +7,53 @@ import 'package:firebase_auth/firebase_auth.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Handling background message: ${message.messageId}');
+  try {
+    const androidDetails = AndroidNotificationDetails(
+      'high_importance_channel',
+      'High Importance Notifications',
+      channelDescription: 'This channel is used for important notifications.',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+    );
+    const iosDetails = DarwinNotificationDetails();
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
+    
+    // Create channel for Android background messages
+    final androidPlugin = localNotifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'high_importance_channel',
+          'High Importance Notifications',
+          description: 'This channel is used for important notifications.',
+          importance: Importance.high,
+        ),
+      );
+    }
+
+    await localNotifications.initialize(
+      const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(),
+      ),
+    );
+
+    await localNotifications.show(
+      message.hashCode,
+      message.notification?.title ?? 'Hel Lo Message',
+      message.notification?.body ?? message.data['body'] ?? 'New message received',
+      details,
+    );
+  } catch (e) {
+    debugPrint('Background message handler notification error: $e');
+  }
 }
 
 class NotificationService {
@@ -20,6 +67,29 @@ class NotificationService {
       android: androidSettings,
       iOS: iosSettings,
     );
+
+    // Create Android Notification Channels
+    final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'high_importance_channel',
+          'High Importance Notifications',
+          description: 'This channel is used for important notifications.',
+          importance: Importance.high,
+        ),
+      );
+
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'incoming_call_channel',
+          'Incoming Calls',
+          description: 'This channel is used for incoming voice and video calls.',
+          importance: Importance.max,
+        ),
+      );
+    }
 
     await _localNotifications.initialize(initSettings);
 
@@ -78,7 +148,6 @@ class NotificationService {
 
       final bodyText = isPreviewEnabled ? messageText : 'New message received';
 
-      // Show local notification if recipient is on this device or trigger via FCM
       await _localNotifications.show(
         DateTime.now().millisecond,
         senderName,

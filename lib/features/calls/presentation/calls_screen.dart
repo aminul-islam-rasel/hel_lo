@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
@@ -137,12 +138,20 @@ class CallsScreen extends ConsumerWidget {
                           final targetPhoto = isOutgoing ? data['receiverPhoto'] : data['callerPhoto'];
                           final isVideo = data['type'] == 'video';
                           final status = data['status'];
-                          final isMissed = (status == 'missed' || status == 'rejected') && !isOutgoing;
+                          final durationSecs = data['duration'] as int? ?? 0;
+                          final isMissed = (status == 'missed' || status == 'rejected');
 
                           final timestamp = (data['createdAt'] as Timestamp?)?.toDate();
                           final timeStr = timestamp != null
                               ? '${timestamp.day}/${timestamp.month} · ${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}'
                               : 'Just now';
+
+                          String durationStr = '';
+                          if (durationSecs > 0) {
+                            final mins = durationSecs ~/ 60;
+                            final secs = durationSecs % 60;
+                            durationStr = mins > 0 ? ' · $mins min $secs sec' : ' · $secs sec';
+                          }
 
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
@@ -180,7 +189,9 @@ class CallsScreen extends ConsumerWidget {
                                         Row(
                                           children: [
                                             Icon(
-                                              isOutgoing ? Icons.call_made_rounded : Icons.call_received_rounded,
+                                              isMissed
+                                                  ? Icons.call_missed_rounded
+                                                  : (isOutgoing ? Icons.call_made_rounded : Icons.call_received_rounded),
                                               size: 15,
                                               color: isMissed
                                                   ? AppColors.error
@@ -191,6 +202,7 @@ class CallsScreen extends ConsumerWidget {
                                               isVideo ? 'Video Call' : 'Voice Call',
                                               style: AppTextStyles.caption(context, color: theme.colorScheme.onSurfaceVariant).copyWith(fontWeight: FontWeight.w600),
                                             ),
+                                            Text(durationStr, style: AppTextStyles.caption(context, color: theme.colorScheme.onSurfaceVariant)),
                                             Text(' · ', style: AppTextStyles.caption(context)),
                                             Text(
                                               timeStr,
@@ -205,7 +217,7 @@ class CallsScreen extends ConsumerWidget {
                                     icon: Container(
                                       padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
-                                        color: AppColors.primary.withOpacity(0.12),
+                                        color: AppColors.primary.withValues(alpha: 0.12),
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
@@ -242,6 +254,35 @@ class CallsScreen extends ConsumerWidget {
                 ),
               ],
             ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 76.0),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          decoration: BoxDecoration(
+            gradient: AppGradients.primary,
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            boxShadow: AppShadows.floating,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                context.push('/contacts');
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Icon(
+                  Icons.add_call,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -253,7 +294,7 @@ class CallsScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           gradient: isSelected ? AppGradients.primary : null,
-          color: isSelected ? null : AppColors.primary.withOpacity(0.12),
+          color: isSelected ? null : AppColors.primary.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
         child: Text(

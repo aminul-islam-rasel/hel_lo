@@ -166,6 +166,65 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  Future<void> signInWithGoogle() async {
+    state = const AsyncValue.loading();
+    try {
+      final googleProvider = fb.GoogleAuthProvider();
+      final credential = await _auth.signInWithProvider(googleProvider);
+      final user = credential.user;
+      if (user != null) {
+        final docRef = _firestore.collection('users').doc(user.uid);
+        final doc = await docRef.get();
+        if (!doc.exists) {
+          String? token;
+          try {
+            token = await FirebaseMessaging.instance.getToken();
+          } catch (_) {}
+
+          final userModel = UserModel(
+            uid: user.uid,
+            phoneNumber: user.phoneNumber ?? '',
+            displayName: user.displayName ?? 'Google User',
+            username: user.email?.split('@').first.toLowerCase() ?? 'user_${user.uid.substring(0, 5)}',
+            about: 'Hey there! I am using Hel Lo.',
+            status: 'Available',
+            createdAt: DateTime.now(),
+            lastSeen: DateTime.now(),
+            isOnline: true,
+            isVerified: true,
+            pushToken: token,
+            privacySettings: {
+              'profilePhoto': 'everyone',
+              'lastSeen': 'everyone',
+              'about': 'everyone',
+              'readReceipts': true,
+            },
+            notificationSettings: {
+              'sound': true,
+              'vibrate': true,
+              'preview': true,
+            },
+            blockedUserIds: [],
+          );
+          await docRef.set(userModel.toMap());
+        } else {
+          await docRef.update({
+            'isOnline': true,
+            'lastSeen': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      String errorMessage = e.toString();
+      if (errorMessage.contains('invalid-cert-hash')) {
+        errorMessage = 'Google Sign-In configuration error: Please add your app\'s SHA-1 certificate fingerprint in the Firebase Console project settings.';
+      }
+      state = AsyncValue.error(errorMessage, st);
+      throw errorMessage;
+    }
+  }
+
   Future<void> updateProfile({String? displayName, String? about}) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;

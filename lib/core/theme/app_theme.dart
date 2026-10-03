@@ -86,7 +86,7 @@ class AppTheme {
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: AppColors.lightSurface,
-      indicatorColor: AppColors.primary.withOpacity(0.12),
+      indicatorColor: AppColors.primary.withValues(alpha: 0.12),
       elevation: 8,
       shadowColor: Colors.black26,
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -181,7 +181,7 @@ class AppTheme {
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: AppColors.darkSurface,
-      indicatorColor: AppColors.primary.withOpacity(0.2),
+      indicatorColor: AppColors.primary.withValues(alpha: 0.2),
       elevation: 8,
       shadowColor: Colors.black54,
       labelTextStyle: WidgetStateProperty.resolveWith((states) {

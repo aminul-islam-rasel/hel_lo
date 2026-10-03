@@ -88,7 +88,7 @@ class SettingsScreen extends ConsumerWidget {
                         icon: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.12),
+                            color: AppColors.primary.withValues(alpha: 0.12),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.edit_rounded, color: AppColors.primary, size: 18),
@@ -119,7 +119,8 @@ class SettingsScreen extends ConsumerWidget {
               _buildSettingsTile(context, Icons.info_outline_rounded, 'About Hel Lo', 'Version, credits, and terms', () => context.push('/settings/about')),
 
               const SizedBox(height: AppSpacing.xl),
-              Material(
+              Card(
+                elevation: 0,
                 color: isDark ? AppColors.darkCard : AppColors.lightCard,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -130,7 +131,7 @@ class SettingsScreen extends ConsumerWidget {
                   leading: Container(
                     padding: const EdgeInsets.all(AppSpacing.sm),
                     decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.12),
+                      color: AppColors.error.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.logout_rounded, color: AppColors.error, size: 20),
@@ -170,7 +171,8 @@ class SettingsScreen extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Material(
+      child: Card(
+        elevation: 0,
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -181,7 +183,7 @@ class SettingsScreen extends ConsumerWidget {
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.12),
+              color: AppColors.primary.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: AppColors.primary, size: 20),

@@ -187,6 +187,31 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           : const Text('Create Account'),
                     ),
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
+                      side: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.5)),
+                    ),
+                    onPressed: _isLoading ? null : () async {
+                      final router = GoRouter.of(context);
+                      final messenger = ScaffoldMessenger.of(context);
+                      setState(() => _isLoading = true);
+                      try {
+                        await ref.read(authControllerProvider.notifier).signInWithGoogle();
+                        router.go('/home');
+                      } catch (e) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text('Google Sign-In failed: $e'), backgroundColor: AppColors.error),
+                        );
+                      } finally {
+                        if (mounted) setState(() => _isLoading = false);
+                      }
+                    },
+                    icon: const Icon(Icons.g_mobiledata_rounded, size: 28, color: AppColors.primary),
+                    label: const Text('Continue with Google'),
+                  ),
                   const SizedBox(height: AppSpacing.xl),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,

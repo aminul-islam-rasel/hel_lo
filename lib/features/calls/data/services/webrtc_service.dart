@@ -73,6 +73,7 @@ class WebRtcService {
             appleAudioCategoryOptions: {
               AppleAudioCategoryOption.defaultToSpeaker,
               AppleAudioCategoryOption.allowBluetooth,
+              AppleAudioCategoryOption.allowAirPlay,
             },
             appleAudioMode: AppleAudioMode.voiceChat,
           ),

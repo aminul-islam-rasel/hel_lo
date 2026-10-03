@@ -56,7 +56,7 @@ class _CreateStatusScreenState extends ConsumerState<CreateStatusScreen> {
         'userId': user.uid,
         'userName': userName,
         'text': text,
-        'colorHex': _backgroundColor.value,
+        'colorHex': _backgroundColor.toARGB32(),
         'createdAt': FieldValue.serverTimestamp(),
       });
 

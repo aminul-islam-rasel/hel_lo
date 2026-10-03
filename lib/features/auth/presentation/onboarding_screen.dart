@@ -99,20 +99,31 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(38),
-                          decoration: BoxDecoration(
-                            gradient: AppGradients.primary,
-                            shape: BoxShape.circle,
-                            boxShadow: AppShadows.floating,
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.8, end: 1.0),
+                          duration: const Duration(milliseconds: 600),
+                          curve: Curves.elasticOut,
+                          builder: (context, scale, child) {
+                            return Transform.scale(
+                              scale: scale,
+                              child: child,
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(42),
+                            decoration: BoxDecoration(
+                              gradient: AppGradients.primary,
+                              shape: BoxShape.circle,
+                              boxShadow: AppShadows.floating,
+                            ),
+                            child: Icon(item.icon, size: 84, color: Colors.white),
                           ),
-                          child: Icon(item.icon, size: 80, color: Colors.white),
                         ),
                         const SizedBox(height: AppSpacing.xxxl),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.12),
+                            color: AppColors.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(AppRadius.pill),
                           ),
                           child: Text(
@@ -152,7 +163,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     height: 8,
                     width: _currentPage == index ? 28 : 8,
                     decoration: BoxDecoration(
-                      color: _currentPage == index ? AppColors.primary : AppColors.primary.withOpacity(0.25),
+                      color: _currentPage == index ? AppColors.primary : AppColors.primary.withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                     ),
                   ),

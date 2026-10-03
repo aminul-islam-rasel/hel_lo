@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
@@ -25,13 +27,30 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ValueNotifier<bool> _hasTextNotifier = ValueNotifier(false);
+  Timer? _typingTimer;
 
   @override
   void initState() {
     super.initState();
     _markAsRead();
-    _messageController.addListener(() {
-      _hasTextNotifier.value = _messageController.text.trim().isNotEmpty;
+    _messageController.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    _hasTextNotifier.value = _messageController.text.trim().isNotEmpty;
+
+    final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    FirebaseFirestore.instance.collection('conversations').doc(widget.conversationId).update({
+      'typingUserId': currentUserId,
+    }).catchError((_) {});
+
+    _typingTimer?.cancel();
+    _typingTimer = Timer(const Duration(seconds: 2), () {
+      FirebaseFirestore.instance.collection('conversations').doc(widget.conversationId).update({
+        'typingUserId': null,
+      }).catchError((_) {});
     });
   }
 
@@ -49,6 +68,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
   @override
   void dispose() {
+    _typingTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     _hasTextNotifier.dispose();
@@ -57,6 +77,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
   Future<void> _sendCustomMessage(String text, {String type = 'text'}) async {
     if (text.isEmpty) return;
+    HapticFeedback.lightImpact();
 
     try {
       final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
@@ -83,7 +104,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       await messageRef.set(messageData);
 
       final convDoc = await FirebaseFirestore.instance.collection('conversations').doc(widget.conversationId).get();
-      final convData = convDoc.data() as Map<String, dynamic>?;
+      final convData = convDoc.data();
       final memberIds = List<String>.from(convData?['memberIds'] ?? []);
       final recipients = memberIds.where((id) => id != currentUserId).toList();
 
@@ -94,6 +115,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         'lastMessage': type == 'text' ? text : '[$type shared]',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'lastMessageSenderId': currentUserId,
+        'typingUserId': null,
         'unreadBy': recipients,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -115,6 +137,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   void _showOptions(BuildContext context, DocumentSnapshot doc) {
+    HapticFeedback.mediumImpact();
     final data = doc.data() as Map<String, dynamic>;
     final isDeleted = data['isDeleted'] ?? false;
     if (isDeleted) return;
@@ -136,13 +159,39 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               width: 42,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.3),
+                color: Colors.grey.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
             Text('Message Options', style: AppTextStyles.headlineMedium(context).copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: AppSpacing.lg),
+            // Quick Reactions Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: ['👍', '❤️', '😂', '😮', '😢', '🔥'].map((emoji) {
+                return InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _addReaction(doc, emoji);
+                  },
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(emoji, style: const TextStyle(fontSize: 28)),
+                  ),
+                );
+              }).toList(),
+            ),
+            const Divider(height: 24),
+            ListTile(
+              leading: const Icon(Icons.push_pin_rounded, color: AppColors.primary),
+              title: const Text('Pin Message'),
+              onTap: () {
+                Navigator.pop(context);
+                _pinMessage(doc);
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.edit_rounded, color: AppColors.primary),
               title: const Text('Edit Message'),
@@ -163,6 +212,45 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _addReaction(DocumentSnapshot doc, String emoji) async {
+    final currentUserId = fb.FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return;
+    try {
+      final data = doc.data() as Map<String, dynamic>;
+      final reactions = Map<String, dynamic>.from(data['reactions'] ?? {});
+      reactions[currentUserId] = emoji;
+      await doc.reference.update({'reactions': reactions});
+    } catch (e) {
+      debugPrint('Error adding reaction: $e');
+    }
+  }
+
+  Future<void> _pinMessage(DocumentSnapshot doc) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final data = doc.data() as Map<String, dynamic>;
+      final text = data['text'] ?? '';
+      await FirebaseFirestore.instance.collection('conversations').doc(widget.conversationId).update({
+        'pinnedMessage': text,
+      });
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Message pinned')),
+      );
+    } catch (e) {
+      debugPrint('Error pinning message: $e');
+    }
+  }
+
+  Future<void> _unpinMessage() async {
+    try {
+      await FirebaseFirestore.instance.collection('conversations').doc(widget.conversationId).update({
+        'pinnedMessage': FieldValue.delete(),
+      });
+    } catch (e) {
+      debugPrint('Error unpinning message: $e');
+    }
   }
 
   void _editMessage(BuildContext context, DocumentSnapshot doc) {
@@ -189,6 +277,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               final newText = editController.text.trim();
               Navigator.pop(context);
               if (newText.isEmpty || newText == currentText) return;
+              final messenger = ScaffoldMessenger.of(context);
 
               try {
                 await FirebaseFirestore.instance
@@ -201,11 +290,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   'isEdited': true,
                 });
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to edit message: $e'), backgroundColor: AppColors.error),
-                  );
-                }
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Failed to edit message: $e'), backgroundColor: AppColors.error),
+                );
               }
             },
             child: const Text('Save'),
@@ -230,6 +317,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () async {
               Navigator.pop(context);
+              final messenger = ScaffoldMessenger.of(context);
               try {
                 await FirebaseFirestore.instance
                     .collection('conversations')
@@ -241,11 +329,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   'text': '🚫 This message was deleted',
                 });
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to delete message: $e'), backgroundColor: AppColors.error),
-                  );
-                }
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Failed to delete message: $e'), backgroundColor: AppColors.error),
+                );
               }
             },
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
@@ -256,6 +342,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   void _showAttachmentBottomSheet() {
+    HapticFeedback.lightImpact();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
@@ -273,7 +360,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               width: 42,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.3),
+                color: Colors.grey.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
             ),
@@ -285,11 +372,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               children: [
                 _buildAttachmentOption(Icons.image_rounded, 'Gallery', const Color(0xFF8B5CF6), () {
                   Navigator.pop(context);
-                  _sendCustomMessage('📷 Photo shared', type: 'image');
+                  _showMediaPreviewDialog('image');
                 }),
                 _buildAttachmentOption(Icons.camera_alt_rounded, 'Camera', const Color(0xFFEC4899), () {
                   Navigator.pop(context);
-                  _sendCustomMessage('📸 Photo captured', type: 'image');
+                  _showMediaPreviewDialog('image');
                 }),
                 _buildAttachmentOption(Icons.insert_drive_file_rounded, 'Document', const Color(0xFF6366F1), () {
                   Navigator.pop(context);
@@ -308,6 +395,59 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     );
   }
 
+  void _showMediaPreviewDialog(String type) {
+    final captionController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+        title: const Text('Rich Media Preview'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 200,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              ),
+              child: const Center(
+                child: Icon(Icons.image_rounded, size: 64, color: AppColors.primary),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: captionController,
+              decoration: const InputDecoration(
+                hintText: 'Add a caption...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              final caption = captionController.text.trim();
+              final text = caption.isNotEmpty ? caption : '📷 Photo shared';
+              _sendCustomMessage(text, type: type);
+            },
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAttachmentOption(IconData icon, String label, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -317,9 +457,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               shape: BoxShape.circle,
-              border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+              border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
             ),
             child: Icon(icon, color: color, size: 28),
           ),
@@ -341,6 +481,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         final convData = convSnapshot.data?.data() as Map<String, dynamic>?;
         final memberIds = List<String>.from(convData?['memberIds'] ?? []);
         final otherUserId = memberIds.firstWhere((id) => id != currentUserId, orElse: () => '');
+        final typingUserId = convData?['typingUserId'];
+        final isTyping = typingUserId != null && typingUserId != currentUserId;
 
         return StreamBuilder<DocumentSnapshot>(
           stream: otherUserId.isNotEmpty
@@ -350,6 +492,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
             final otherName = userData?['displayName'] ?? 'User';
             final isOnline = userData?['isOnline'] ?? false;
+            final lastSeenTs = userData?['lastSeen'] as Timestamp?;
+            final lastSeenStr = lastSeenTs != null
+                ? 'Last seen today at ${lastSeenTs.toDate().hour.toString().padLeft(2, '0')}:${lastSeenTs.toDate().minute.toString().padLeft(2, '0')}'
+                : 'Offline';
 
             return Scaffold(
               appBar: AppBar(
@@ -402,11 +548,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                             ),
                           ),
                           Text(
-                            isOnline ? 'Online now' : 'Offline',
+                            isTyping
+                                ? 'typing...'
+                                : (isOnline ? 'Online now' : lastSeenStr),
                             style: AppTextStyles.caption(
                               context,
-                              color: isOnline ? AppColors.online : AppColors.offline,
-                            ).copyWith(fontWeight: isOnline ? FontWeight.bold : FontWeight.normal),
+                              color: isTyping ? AppColors.primary : (isOnline ? AppColors.online : AppColors.offline),
+                            ).copyWith(fontWeight: (isOnline || isTyping) ? FontWeight.bold : FontWeight.normal),
                           ),
                         ],
                       ),
@@ -418,12 +566,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                     icon: Container(
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.12),
+                        color: AppColors.primary.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.videocam_rounded, color: AppColors.primary, size: 18),
                     ),
                     onPressed: () {
+                      HapticFeedback.mediumImpact();
                       if (otherUserId.isEmpty) return;
                       context.push('/calls/outgoing', extra: {
                         'receiverId': otherUserId,
@@ -442,12 +591,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                     icon: Container(
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.12),
+                        color: AppColors.primary.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.call_rounded, color: AppColors.primary, size: 18),
                     ),
                     onPressed: () {
+                      HapticFeedback.mediumImpact();
                       if (otherUserId.isEmpty) return;
                       context.push('/calls/outgoing', extra: {
                         'receiverId': otherUserId,
@@ -472,6 +622,36 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               ),
               body: Column(
                 children: [
+                  if (convData?['pinnedMessage'] != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                      color: isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.push_pin_rounded, color: AppColors.primary, size: 18),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Pinned Message', style: AppTextStyles.caption(context, color: AppColors.primary).copyWith(fontWeight: FontWeight.bold)),
+                                Text(
+                                  convData!['pinnedMessage'],
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.bodySmall(context),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: _unpinMessage,
+                            tooltip: 'Unpin',
+                          ),
+                        ],
+                      ),
+                    ),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
@@ -479,6 +659,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                           .doc(widget.conversationId)
                           .collection('messages')
                           .orderBy('createdAt', descending: true)
+                          .limit(50)
                           .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
@@ -525,87 +706,136 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                             final text = data['text'] ?? '';
                             final isDeleted = data['isDeleted'] ?? false;
                             final isEdited = data['isEdited'] ?? false;
+                            final reactions = Map<String, dynamic>.from(data['reactions'] ?? {});
                             final timestamp = data['createdAt'] as Timestamp?;
                             final timeStr = timestamp != null
                                 ? '${timestamp.toDate().hour.toString().padLeft(2, '0')}:${timestamp.toDate().minute.toString().padLeft(2, '0')}'
                                 : 'Just now';
 
+                            final hasUrl = text.contains('http://') || text.contains('https://');
+
                             return GestureDetector(
                               onLongPress: isMe && !isDeleted ? () => _showOptions(context, doc) : null,
                               child: Align(
                                 alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                                child: Container(
-                                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-                                  margin: const EdgeInsets.symmetric(vertical: 5),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    gradient: isMe && !isDeleted ? AppGradients.primary : null,
-                                    color: isMe && !isDeleted
-                                        ? null
-                                        : (isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurface),
-                                    borderRadius: BorderRadius.only(
-                                      topLeft: const Radius.circular(AppRadius.xl),
-                                      topRight: const Radius.circular(AppRadius.xl),
-                                      bottomLeft: Radius.circular(isMe ? AppRadius.xl : 4),
-                                      bottomRight: Radius.circular(isMe ? 4 : AppRadius.xl),
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Container(
+                                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+                                      margin: const EdgeInsets.symmetric(vertical: 6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      decoration: BoxDecoration(
+                                        gradient: isMe && !isDeleted ? AppGradients.primary : null,
                                         color: isMe && !isDeleted
-                                            ? AppColors.primary.withOpacity(0.2)
-                                            : Colors.black.withOpacity(0.04),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ],
-                                    border: Border.all(
-                                      color: isMe
-                                          ? Colors.transparent
-                                          : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        text,
-                                        style: AppTextStyles.bodyLarge(context).copyWith(
-                                          color: isDeleted
-                                              ? (isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted)
-                                              : (isMe ? Colors.white : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary)),
-                                          fontStyle: isDeleted ? FontStyle.italic : FontStyle.normal,
-                                          height: 1.35,
+                                            ? null
+                                            : (isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurface),
+                                        borderRadius: BorderRadius.only(
+                                          topLeft: const Radius.circular(AppRadius.xl),
+                                          topRight: const Radius.circular(AppRadius.xl),
+                                          bottomLeft: Radius.circular(isMe ? AppRadius.xl : 4),
+                                          bottomRight: Radius.circular(isMe ? 4 : AppRadius.xl),
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: isMe && !isDeleted
+                                                ? AppColors.primary.withValues(alpha: 0.2)
+                                                : Colors.black.withValues(alpha: 0.04),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                        border: Border.all(
+                                          color: isMe
+                                              ? Colors.transparent
+                                              : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                                          width: 1,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                      child: Column(
+                                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                                         children: [
-                                          if (isEdited && !isDeleted) ...[
-                                            Text(
-                                              'edited · ',
-                                              style: AppTextStyles.caption(
-                                                context,
-                                                color: isMe ? Colors.white.withOpacity(0.7) : (isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted),
-                                              ).copyWith(fontSize: 10),
+                                          Text(
+                                            text,
+                                            style: AppTextStyles.bodyLarge(context).copyWith(
+                                              color: isDeleted
+                                                  ? (isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted)
+                                                  : (isMe ? Colors.white : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary)),
+                                              fontStyle: isDeleted ? FontStyle.italic : FontStyle.normal,
+                                              height: 1.35,
+                                            ),
+                                          ),
+                                          if (hasUrl && !isDeleted) ...[
+                                            const SizedBox(height: 8),
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(AppRadius.md),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(Icons.link_rounded, size: 18, color: Colors.white70),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      'Web Link Preview Card',
+                                                      style: AppTextStyles.caption(context, color: Colors.white70).copyWith(fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ],
-                                          Text(
-                                            timeStr,
-                                            style: AppTextStyles.caption(
-                                              context,
-                                              color: isMe ? Colors.white.withOpacity(0.8) : (isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted),
-                                            ).copyWith(fontSize: 11),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              if (isEdited && !isDeleted) ...[
+                                                Text(
+                                                  'edited · ',
+                                                  style: AppTextStyles.caption(
+                                                    context,
+                                                    color: isMe ? Colors.white.withValues(alpha: 0.7) : (isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted),
+                                                  ).copyWith(fontSize: 10),
+                                                ),
+                                              ],
+                                              Text(
+                                                timeStr,
+                                                style: AppTextStyles.caption(
+                                                  context,
+                                                  color: isMe ? Colors.white.withValues(alpha: 0.8) : (isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted),
+                                                ).copyWith(fontSize: 11),
+                                              ),
+                                              if (isMe && !isDeleted) ...[
+                                                const SizedBox(width: 4),
+                                                const Icon(Icons.done_all_rounded, size: 14, color: Colors.white),
+                                              ],
+                                            ],
                                           ),
-                                          if (isMe && !isDeleted) ...[
-                                            const SizedBox(width: 4),
-                                            const Icon(Icons.done_all_rounded, size: 14, color: Colors.white),
-                                          ],
                                         ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    if (reactions.isNotEmpty)
+                                      Positioned(
+                                        bottom: -6,
+                                        right: isMe ? 8 : null,
+                                        left: isMe ? null : 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: isDark ? AppColors.darkSurface : Colors.white,
+                                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                                            boxShadow: AppShadows.floating,
+                                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                                          ),
+                                          child: Text(
+                                            reactions.values.join(' '),
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             );

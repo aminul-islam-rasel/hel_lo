@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_gradients.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../core/widgets/app_loading_widget.dart';
 
@@ -101,7 +100,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.secondary.withOpacity(0.5 * _glowAnimation.value),
+                              color: AppColors.secondary.withValues(alpha: 0.5 * _glowAnimation.value),
                               blurRadius: 36 * _glowAnimation.value,
                               spreadRadius: 8 * _glowAnimation.value,
                             ),
@@ -127,7 +126,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     'Next-Gen Communication Experience',
-                    style: AppTextStyles.bodyMedium(context, color: Colors.white.withOpacity(0.85)).copyWith(
+                    style: AppTextStyles.bodyMedium(context, color: Colors.white.withValues(alpha: 0.85)).copyWith(
                       letterSpacing: 0.2,
                     ),
                   ),

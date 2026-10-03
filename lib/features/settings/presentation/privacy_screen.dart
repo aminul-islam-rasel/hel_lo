@@ -100,7 +100,7 @@ class PrivacyScreen extends ConsumerWidget {
                     newSettings['readReceipts'] = val;
                     ref.read(authControllerProvider.notifier).updatePrivacySettings(newSettings);
                   },
-                  activeColor: AppColors.primary,
+                  activeThumbColor: AppColors.primary,
                 ),
               ),
             ],

@@ -63,7 +63,7 @@ class NotificationsSettingsScreen extends ConsumerWidget {
         subtitle: Text(subtitle, style: AppTextStyles.bodySmall(context)),
         value: value,
         onChanged: onChanged,
-        activeColor: AppColors.primary,
+        activeThumbColor: AppColors.primary,
       ),
     );
   }

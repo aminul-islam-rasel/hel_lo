@@ -12,7 +12,7 @@ import '../../../core/theme/app_shadows.dart';
 import '../../../core/theme/app_gradients.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../core/utils/conversation_utils.dart';
-import '../../../core/widgets/app_loading_widget.dart';
+import '../../../core/widgets/app_shimmer_widget.dart';
 
 class ContactsScreen extends ConsumerStatefulWidget {
   const ContactsScreen({super.key});
@@ -244,7 +244,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
         ],
       ),
       body: _isLoadingContacts
-          ? const Center(child: AppLoadingWidget(message: 'Syncing device contacts...'))
+          ? ListView.builder(
+              itemCount: 6,
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.lg),
+              itemBuilder: (context, index) => AppShimmerWidget.chatListTile(context),
+            )
           : !_permissionGranted
               ? Center(
                   child: Padding(
@@ -255,7 +259,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.12),
+                            color: AppColors.primary.withValues(alpha: 0.12),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.contacts_rounded, size: 56, color: AppColors.primary),
@@ -292,7 +296,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                   stream: FirebaseFirestore.instance.collection('users').snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: AppLoadingWidget(message: 'Finding registered contacts...'));
+                      return ListView.builder(
+                        itemCount: 6,
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.lg),
+                        itemBuilder: (context, index) => AppShimmerWidget.chatListTile(context),
+                      );
                     }
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                       return Center(

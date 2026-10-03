@@ -95,8 +95,8 @@ class _AppLoadingWidgetState extends State<AppLoadingWidget> with SingleTickerPr
               shape: BoxShape.circle,
               gradient: SweepGradient(
                 colors: [
-                  activeColor.withOpacity(0.0),
-                  activeColor.withOpacity(0.3),
+                  activeColor.withValues(alpha: 0.0),
+                  activeColor.withValues(alpha: 0.3),
                   activeColor,
                 ],
               ),

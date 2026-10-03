@@ -35,21 +35,3 @@ A complete, production-ready, modern WhatsApp-like real-time messaging applicati
      firebase deploy --only firestore:rules,storage,firestore:indexes
      ```
 
----
-
-## Running the Application
-
-1. Install dependencies:
-   ```bash
-   flutter pub get
-   ```
-
-2. Run code generation (if using riverpod generator):
-   ```bash
-   flutter pub run build_runner build --delete-conflicting-outputs
-   ```
-
-3. Run the app on connected device or emulator:
-   ```bash
-   flutter run
-   ```
